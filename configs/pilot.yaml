@@ -1,0 +1,30 @@
+# Pilot: the full pipeline on a slice of both datasets with real models. Every axis, every mode,
+# both library arms -- but few graphs. Its job is to catch prompt-compliance problems (does the
+# model fill the template? does it hardcode `ans`? does it ignore the library instruction?) and
+# to measure real per-call cost before the full run. Its numbers are not results.
+name: pilot
+datasets:
+  graphqa:
+    n_graphs: 3
+    seed: 0
+    generators: [er, ba, sfn, sbm, star, path, complete]
+    tasks: [edge_existence, node_degree, cycle_check, connected_nodes]
+    variants:
+      relabel: {seeds: 1}
+      order: {kinds: [shuffle_all], seeds: 1}
+      structure: {toggle: true, replicated: false}
+      syntax: {kinds: [json, networkx_code]}
+  erdos:
+    tasks: [degree, edge_existence, shortest_path, bridges]
+    n_per_task: 2
+    seed: 0
+    max_prompt_chars: 3000
+    variants:
+      relabel: {seeds: 1}
+      order: {kinds: [shuffle_all], seeds: 1}
+      structure: {toggle: true, replicated: false}
+      syntax: {kinds: [json, networkx_code]}
+modes: [direct, code, graph_as_code]
+libraries: [networkx, native]
+models: [hf-deepseek-v3, hf-qwen3-8b]
+exec: {timeout: 20, mem_mb: 1024, workers: 4}

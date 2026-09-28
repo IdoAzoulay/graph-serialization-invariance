@@ -1,0 +1,135 @@
+# One OpenAI-compatible client covers every provider. Keys come from the environment
+# (see .env.example). Model ids should be checked against the provider catalog before a big run.
+
+stub:
+  provider: stub
+  stub: {behaviour: mix}      # or one of: correct, wrong_logic, drop_edge, crash, timeout, no_nx, bad_format
+
+deepseek-chat:
+  base_url: https://api.deepseek.com/v1
+  api_key_env: DEEPSEEK_API_KEY
+  model: deepseek-chat
+  max_concurrency: 8
+  max_tokens: 4096
+
+deepseek-reasoner:
+  base_url: https://api.deepseek.com/v1
+  api_key_env: DEEPSEEK_API_KEY
+  model: deepseek-reasoner
+  max_concurrency: 8
+  max_tokens: 8192
+
+qwen-7b:
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
+  model: qwen/qwen-2.5-7b-instruct
+  max_concurrency: 4
+  max_tokens: 4096
+
+# ---- HuggingFace Inference Providers (one token, many providers, OpenAI-compatible) ----
+# The router picks a provider per model; a ":provider" suffix forces one. Some providers report
+# `estimated_cost` in usage (deepinfra, together); featherless-ai does not, so its cost has to be
+# estimated from token counts. Qwen3-* models think by default and return empty `content` when
+# the budget runs out -- avoid them unless thinking is disabled at the provider.
+
+hf-deepseek-v3:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: deepseek-ai/DeepSeek-V3
+  # Measured 2026-09-17 on deepinfra, no 429s at any level: 11.5 calls/min at 4, 35.5 at 16,
+  # 48.6 at 32 (median latency 17 s -> 23 s, so the provider starts queuing). 16 is the default;
+  # 32 buys ~25% for the full run if it is still holding when you check the retry log.
+  max_concurrency: 16
+  max_tokens: 4096
+
+hf-qwen3-8b:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: Qwen/Qwen3-8B:featherless-ai
+  # featherless enforces a hard per-user cap of 10 concurrent requests (429
+  # "concurrency_limit_exceeded"; measured 2026-09-17 -- 16 workers 429'd continuously and some
+  # records gave up after 5 retries). 8 stays under it with headroom for a second process.
+  max_concurrency: 8
+  max_retries: 8
+  max_tokens: 4096
+  # Qwen3 thinks by default and spends the whole budget in `reasoning_content`, returning empty
+  # `content`. featherless-ai honours the chat-template switch below; nscale (the router's default
+  # provider for this id) ignores it and needs "/no_think" in the prompt text instead, which would
+  # make the prompt model-specific -- so the provider is pinned. Verified 2026-09-16.
+  extra:
+    extra_body: {chat_template_kwargs: {enable_thinking: false}}
+
+hf-deepseek-v3.1-novita:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: deepseek-ai/DeepSeek-V3.1:novita
+  # Benchmarked 2026-09-17 on 64 real prompts: 77 calls/min at concurrency 32, 0 truncated, no
+  # reasoning leakage, content non-empty on all 64. deepinfra serves V3 and V3.1 at ~30/min, so
+  # the provider is pinned. novita does NOT report usage.estimated_cost -- spend has to be read
+  # from the HF billing page or estimated from tokens x list price.
+  max_concurrency: 32
+  max_retries: 8
+  max_tokens: 4096
+
+hf-qwen3-8b-nscale:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: Qwen/Qwen3-8B:nscale
+  # nscale ignores chat_template_kwargs but honours Qwen3's "/no_think" soft switch, sent via
+  # user_suffix so the shared prompt text is unchanged. Measured 2026-09-17 on 40 prompts that
+  # loop to 4096 tokens on featherless: 0/40 truncated here, 124 calls/min at 16 workers, no
+  # 429s. Separate model name so its cache never mixes with featherless's replies.
+  user_suffix: "/no_think"
+  max_concurrency: 16
+  max_retries: 8
+  max_tokens: 4096
+
+# ---- Mid-size points between Qwen3-8B (8.2B) and DeepSeek-V3.1 (684.5B, HF safetensors totals) ----
+# Total parameters: 8.2 -> 31.3 -> 290.9 -> 684.5 (x3.8, x9.3, x2.4), one provider for both.
+# Gemma 4 31B (Google) is dense; DeepSeek-V4-Flash is MoE with 13B active and shares a company
+# with the 684.5B point, chosen over Tencent Hy3 for cost. Thinking is switched off through the
+# chat template, as for Qwen3-8B, so every model answers without a hidden chain of thought.
+# gpt-oss-120b (117B) fit the spacing better but cannot turn reasoning off (lowest is "low"),
+# which would change what the direct mode measures.
+# UNVERIFIED: probe for empty content / reasoning leakage / truncation / system-role support
+# before the full run.
+
+hf-gemma-4-31b:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: google/gemma-4-31B-it:novita
+  # Measured 2026-09-19 (calls/min = workers / mean latency): ~115 at 32 and ~220 at 64 on
+  # deepinfra; ~214 at 64 and ~273 at 96 on novita (p50 15.9 s, a few 500s absorbed by retries).
+  # No reasoning, no truncation at any level. 96 is what brings the full run under 5 h.
+  max_concurrency: 96
+  max_retries: 8
+  max_tokens: 4096
+  extra:
+    extra_body: {chat_template_kwargs: {enable_thinking: false}}
+
+hf-deepseek-v4-flash:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: deepseek-ai/DeepSeek-V4-Flash:deepinfra
+  # Measured 2026-09-19 on 64 real prompts at 32 workers: 0 truncated, 0 errors, no reasoning
+  # (the switch below is honoured), p50 5.1 s / p95 9.5 s, 171-377 calls/min, ~$0.000067 per call.
+  max_concurrency: 32
+  max_retries: 8
+  max_tokens: 4096
+  # V4 has a documented non-think mode; "thinking" is the DeepSeek chat-template switch since V3.1.
+  extra:
+    extra_body: {chat_template_kwargs: {thinking: false}}
+
+hf-qwen2.5-7b:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: Qwen/Qwen2.5-7B-Instruct:featherless-ai   # the only live provider for this id
+  max_concurrency: 4
+  max_tokens: 4096
+
+hf-llama3.1-8b:
+  base_url: https://router.huggingface.co/v1
+  api_key_env: HF_TOKEN
+  model: meta-llama/Llama-3.1-8B-Instruct
+  max_concurrency: 4
+  max_tokens: 4096

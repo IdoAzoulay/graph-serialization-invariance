@@ -1,0 +1,7 @@
+dataset,scheme,axis,n_instances,n_variants,variants_same_prompt,instances_all_same
+erdos,canonical,relabel,1200,4799,1.0,1.0
+erdos,canonical,order,1200,3524,1.0,1.0
+erdos,degree_wl,relabel,1200,4799,0.5321942071264847,0.25
+erdos,degree_wl,order,1200,3524,1.0,1.0
+erdos,bfs_min,relabel,1200,4799,0.5692852677641175,0.27
+erdos,bfs_min,order,1200,3524,1.0,1.0

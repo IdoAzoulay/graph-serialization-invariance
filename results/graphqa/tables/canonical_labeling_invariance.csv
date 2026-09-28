@@ -1,0 +1,7 @@
+dataset,scheme,axis,n_instances,n_variants,variants_same_prompt,instances_all_same
+graphqa,canonical,relabel,700,2799,1.0,1.0
+graphqa,canonical,order,689,1926,1.0,1.0
+graphqa,degree_wl,relabel,700,2799,0.7084673097534834,0.5385714285714286
+graphqa,degree_wl,order,689,1926,1.0,1.0
+graphqa,bfs_min,relabel,700,2799,0.7606287959985709,0.5757142857142857
+graphqa,bfs_min,order,689,1926,1.0,1.0
