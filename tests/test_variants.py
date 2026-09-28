@@ -136,3 +136,20 @@ def test_adjacency_list_round_trip_with_single_neighbour_lines():
     text = render(v)
     assert "is connected to node 0." in text  # a leaf has one neighbour
     assert parse(text, "graphqa_nl", "adj_list", False) == true_edge_set(v)
+
+
+def test_relabeling_writes_undirected_edges_smaller_label_first():
+    for inst in INSTANCES:
+        base = canonical(inst, structure="edge_list", syntax="plain")
+        for v in [relabel_identity(base)] + [relabel(base, s) for s in range(3)]:
+            assert all(e[0] <= e[1] for e in v.edge_seq), v.variant_id
+            old_of_new = {new: old for old, new in v.label_map.items()}  # still the same graph
+            back = [[old_of_new[e[0]], old_of_new[e[1]]] for e in v.edge_seq]
+            assert normalize_edges(back, False) == normalize_edges(inst.edges, False)
+
+
+def test_an_empty_graph_says_so():
+    from gsi.data.base import GraphInstance
+    empty = GraphInstance(id="e", dataset="graphqa", task="node_count", directed=False, weighted=False, nodes=[0, 1],
+                          edges=[], query_args={}, answer_type="int", ground_truth=2)
+    assert render(canonical(empty, structure="edge_list", syntax="graphqa_nl")).endswith("The edges in G are: (none).")

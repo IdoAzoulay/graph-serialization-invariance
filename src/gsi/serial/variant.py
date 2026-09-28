@@ -93,10 +93,17 @@ def _sort_in_place(node_seq: list, edge_seq: list) -> None:
     edge_seq.sort(key=lambda e: (e[0], e[1]))
 
 
+def _min_first(edge_seq: list, directed: bool) -> list:
+    """Write each undirected edge smaller label first. Renaming the nodes of (u, v) can put the larger
+    label first, and an edge's orientation carries no meaning but does reach the text: without this a
+    relabeling would change the labels and the orientation of about half the edges at once."""
+    return edge_seq if directed else [[min(e[0], e[1]), max(e[0], e[1]), *e[2:]] for e in edge_seq]
+
+
 def relabel_identity(base: Variant) -> Variant:
     """The sorted, identity-labelled reference every relabeling is compared against."""
     node_seq = list(base.node_seq)
-    edge_seq = [list(e) for e in base.edge_seq]
+    edge_seq = _min_first([list(e) for e in base.edge_seq], base.directed)
     _sort_in_place(node_seq, edge_seq)
     return _derive(base, "relabel", IDENTITY, params={"seed": IDENTITY, "ordering": "sorted_st"},
                    node_seq=node_seq, edge_seq=edge_seq)
@@ -113,6 +120,7 @@ def relabel(base: Variant, seed: int, sort: bool = True) -> Variant:
     edge_seq = [[new_of_old[e[0]], new_of_old[e[1]], *e[2:]] for e in base.edge_seq]
     params: dict[str, Any] = {"seed": seed}
     if sort:
+        edge_seq = _min_first(edge_seq, base.directed)
         _sort_in_place(node_seq, edge_seq)
         params["ordering"] = "sorted_st"
     return _derive(base, "relabel", f"s{seed}", params=params,

@@ -116,7 +116,7 @@ def graphqa_edge_list(v: Variant) -> str:
     else:
         head = "In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge."
     edges = " ".join(_edge_str(e[:2]) for e in _edges_for_render(v))
-    return f"{head} G describes a graph among nodes {_nodes_nl(v.node_seq)}.\nThe edges in G are: {edges}."
+    return f"{head} G describes a graph among nodes {_nodes_nl(v.node_seq)}.\nThe edges in G are: {edges or '(none)'}."
 
 
 def graphqa_adj_list(v: Variant) -> str:
