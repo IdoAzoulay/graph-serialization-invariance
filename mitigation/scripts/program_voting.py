@@ -18,9 +18,9 @@ and is skipped. Agreement on one graph does not prove two programs equivalent on
 Then vote over the outputs; ties go to the canonical program's answer, as in answer voting
 (permutation_signal.py). Local execution only; no inference.
 
-    python scripts/program_voting.py --config configs/graphqa.yaml --models m1 m2 [--limit 300]
+    python mitigation/scripts/program_voting.py --config configs/graphqa.yaml --models m1 m2 [--limit 300]
 
-Writes results/<cfg>/tables/program_voting.csv.
+Writes mitigation/results/<cfg>/program_voting.csv.
 """
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ import argparse
 import ast
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 
@@ -36,6 +37,14 @@ from gsi.exec import sandbox
 from gsi.experiment.config import load_config
 from gsi.experiment.run import load_instances, load_variants, score_record
 from gsi.serial.variant import Variant
+
+
+def out_dir(cfg) -> Path:
+    """mitigation/results/<dataset>/, where this experiment's committed tables live."""
+    d = Path(__file__).resolve().parents[1] / "results" / cfg.results_dir.name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
 
 NULL = (None, "null")
 DECLARATIONS = ("nodes", "edges")
@@ -161,7 +170,7 @@ def main():
     pd.set_option("display.width", 200)
     print(f"\n=== E6: the variants' programs, run on the CANONICAL data ({cfg.name}) ===")
     print(out.round(3).to_string(index=False))
-    out.to_csv(cfg.results_dir / "tables" / "program_voting.csv", index=False)
+    out.to_csv(out_dir(cfg) / "program_voting.csv", index=False)
 
 
 if __name__ == "__main__":

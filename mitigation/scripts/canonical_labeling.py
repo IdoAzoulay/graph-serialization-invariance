@@ -14,11 +14,11 @@ Schemes:
                 E3 run; its residual sensitivity is measured, not assumed away.
   bfs_min    -- HEURISTIC: BFS from the smallest (degree, WL) key; ties by the input label.
 
-    python scripts/canonical_labeling.py --config configs/graphqa.yaml --models m1 m2 [--limit N]
-    python scripts/canonical_labeling.py --config configs/graphqa.yaml --invariance-only
+    python mitigation/scripts/canonical_labeling.py --config configs/graphqa.yaml --models m1 m2 [--limit N]
+    python mitigation/scripts/canonical_labeling.py --config configs/graphqa.yaml --invariance-only
 
-Writes results/<cfg>/scored_canon/<scheme>/<model>.jsonl and tables/canonical_labeling.csv
-(paired accuracy deltas); --invariance-only writes tables/canonical_labeling_invariance.csv (no
+Writes results/<cfg>/scored_canon/<scheme>/<model>.jsonl and mitigation/results/<cfg>/canonical_labeling.csv
+(paired accuracy deltas); --invariance-only writes mitigation/results/<cfg>/canonical_labeling_invariance.csv (no
 inference): for each scheme, the share of relabelings that render to the same prompt as the
 canonical form does.
 """
@@ -28,6 +28,7 @@ import argparse
 import hashlib
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -40,6 +41,14 @@ from gsi.prompts.modes import build_prompt
 from gsi.serial.canonical import canonical_order as exact_order
 from gsi.serial.render import render
 from gsi.serial.variant import Variant, _derive, _sort_in_place
+
+
+def out_dir(cfg) -> Path:
+    """mitigation/results/<dataset>/, where this experiment's committed tables live."""
+    d = Path(__file__).resolve().parents[1] / "results" / cfg.results_dir.name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
 
 SCHEMES = ("canonical", "degree_wl", "bfs_min")
 
@@ -157,7 +166,7 @@ def main():
         out = invariance(cfg, instances, variants, args.schemes)
         pd.set_option("display.width", 200)
         print(out.round(4).to_string(index=False))
-        out.to_csv(cfg.results_dir / "tables" / "canonical_labeling_invariance.csv", index=False)
+        out.to_csv(out_dir(cfg) / "canonical_labeling_invariance.csv", index=False)
         return
     if not args.models:
         ap.error("--models is required unless --invariance-only")
@@ -251,7 +260,7 @@ def main():
     pd.set_option("display.width", 220)
     print(f"\n=== E3: canonical labeling, paired accuracy deltas ({cfg.name}) ===")
     print(out.round(3).to_string(index=False))
-    path = cfg.results_dir / "tables" / "canonical_labeling.csv"
+    path = out_dir(cfg) / "canonical_labeling.csv"
     if path.exists() and not out.empty:
         out = merge_rows(pd.read_csv(path, float_precision="round_trip"), out)  # kept rows digit for digit
     out.to_csv(path, index=False)

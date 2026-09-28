@@ -4,9 +4,9 @@ E1 detection  -- does disagreement between the canonical answer and its permuted
                  predict that the canonical answer is wrong?
 E2 voting     -- majority over the canonical + permuted answers, with and without abstention.
 
-    python scripts/permutation_signal.py --config configs/graphqa.yaml [--models ...]
+    python mitigation/scripts/permutation_signal.py --config configs/graphqa.yaml [--models ...]
 
-Writes results/<cfg>/tables/permutation_signal.csv (per model x arm x probe x k) and prints the
+Writes mitigation/results/<cfg>/permutation_signal.csv (per model x arm x probe x k) and prints the
 headline rows. No inference: reads scored/<model>.jsonl only.
 
 Probes. `relabel` uses the seeded relabelings only: the sorted-identity form renames nothing (on
@@ -28,11 +28,20 @@ import argparse
 import itertools
 import json
 from collections import Counter, defaultdict
+from pathlib import Path
 
 import pandas as pd
 
 from gsi.data.base import read_jsonl
 from gsi.experiment.config import load_config
+
+
+def out_dir(cfg) -> Path:
+    """mitigation/results/<dataset>/, where this experiment's committed tables live."""
+    d = Path(__file__).resolve().parents[1] / "results" / cfg.results_dir.name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
 
 PROBES = {"relabel": {"relabel"}, "order": {"order"}, "both": {"relabel", "order"}}
 NULL = (None, "null")
@@ -137,7 +146,7 @@ def main():
                         rows.append({"dataset": cfg.name, "model": m, "arm": arm, "probe": f"{probe}@matched",
                                      "k": k, **e})
     df = pd.DataFrame(rows)
-    out = cfg.results_dir / "tables" / "permutation_signal.csv"
+    out = out_dir(cfg) / "permutation_signal.csv"
     df.to_csv(out, index=False)
     pd.set_option("display.width", 230, "display.max_rows", 300)
     show = df[(df.probe == "both") & (df.k == "all")]

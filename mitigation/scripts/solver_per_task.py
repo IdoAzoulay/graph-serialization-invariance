@@ -6,7 +6,7 @@ the task through the existing sandbox. Permutation invariance of the *prompt* is
 construction; what is measured is (a) the accuracy cost of removing the instance from the prompt
 and (b) whether the model's algorithm itself is invariant when run on permuted data.
 
-    python scripts/solver_per_task.py --config configs/graphqa.yaml --models m1 m2
+    python mitigation/scripts/solver_per_task.py --config configs/graphqa.yaml --models m1 m2
 
 Writes results/<cfg>/scored_solver/<model>.jsonl (one row per variant x library, same schema as
 scored/) and prints accuracy on canonical forms and invariance on the permutation axes.
@@ -18,6 +18,7 @@ import ast
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 
@@ -30,6 +31,13 @@ from gsi.experiment.run import load_dotenv, load_instances, load_variants, make_
 from gsi.prompts.modes import (ANS_HINT, CODEGRAPH_INSTRUCTION, LIBRARIES, LIBRARY_INSTRUCTION, ROLE, Prompt,
                                _graph_notes, task_line)
 from gsi.serial.variant import Variant
+
+
+def out_dir(cfg) -> Path:
+    """mitigation/results/<dataset>/, where this experiment's committed tables live."""
+    d = Path(__file__).resolve().parents[1] / "results" / cfg.results_dir.name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def question_template(inst: GraphInstance, q: str) -> str:
@@ -279,7 +287,7 @@ def main():
     pd.set_option("display.width", 200)
     print("\n=== E5: one solver per task vs per-instance M2 ===")
     print(out.round(3).to_string(index=False))
-    out.to_csv(cfg.results_dir / "tables" / "solver_per_task.csv", index=False)
+    out.to_csv(out_dir(cfg) / "solver_per_task.csv", index=False)
 
 
 if __name__ == "__main__":

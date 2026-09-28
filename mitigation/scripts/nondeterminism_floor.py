@@ -3,8 +3,8 @@
 How often does an IDENTICAL prompt give a different answer? Every "the answer changed under a
 permutation" number is only evidence about the permutation to the extent it exceeds this.
 
-    python scripts/nondeterminism_floor.py --config configs/graphqa.yaml \
-        --models m1 m2 --instances 100 --repeats 4 --out results/floor2_graphqa.json
+    python mitigation/scripts/nondeterminism_floor.py --config configs/graphqa.yaml \
+        --models m1 m2 --instances 100 --repeats 4 --out mitigation/results/graphqa/noise_floor.json
 
 Definitions match `gsi.analysis.tables.invariance_table`, which the first version of this script
 did not (see ANALYSIS.md section 5):
