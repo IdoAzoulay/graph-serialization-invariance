@@ -5,6 +5,7 @@ description = "Serialization-invariance audit of LLM graph code generation"
 requires-python = ">=3.10"
 dependencies = [
     "networkx>=3.2",
+    "numpy>=1.24",
     "pandas>=2.0",
     "pyyaml>=6",
     "openai>=1.40",
@@ -12,8 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-erdos = ["datasets>=2.19"]
-stats = ["scipy>=1.11", "statsmodels>=0.14"]
+erdos = ["datasets>=2.19"]                                   # rebuilding the Erdős instances
+stats = ["scipy>=1.11", "statsmodels>=0.14"]                 # scripts/paper_metrics.py
+reproduce = ["huggingface_hub>=0.24", "pyarrow>=14", "scipy>=1.11", "statsmodels>=0.14"]  # scripts/reproduce.sh
 dev = ["pytest>=8"]
 
 [build-system]

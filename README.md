@@ -22,7 +22,7 @@ Every model reply is published in the Hugging Face dataset [`Dolevabudi/graph-se
 git clone https://github.com/dolev98/graph-serialization-invariance.git
 cd graph-serialization-invariance
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev,stats,erdos]"
+.venv/bin/pip install -e ".[dev,reproduce]"
 scripts/reproduce.sh          # about 4 minutes; add --pdf to rebuild paper/main.pdf with latexmk
 git status                    # CSV/JSON outputs: no changes expected
 ```
@@ -39,9 +39,11 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/review/paper_metrics.json`: every number the paper reports for the main experiment | `scripts/paper_metrics.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
 
-Every CSV and JSON file comes out byte-identical to the committed one. The figures can differ in bytes (Matplotlib version and timestamps) but not in content.
+Every CSV and JSON file comes out byte-identical to the committed one. The figures can differ in bytes (Matplotlib version and timestamps) but not in content. Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2.
 
-Tests: `.venv/bin/python -m pytest` (the main suite, about 20 s, no network) and `.venv/bin/python -m pytest mitigation/tests`.
+Figures 5 and 6 of the paper (`paper/figures/make_figures.py`) draw the values printed in the paper, not the current `paper_metrics.json`.
+
+Tests: `.venv/bin/python -m pytest` (the main suite, about 35 s, no network) and `.venv/bin/python -m pytest mitigation/tests`.
 
 ## Repository layout
 
@@ -63,11 +65,13 @@ paper/              LaTeX source, figures and the compiled PDF
 mitigation/         separable mitigation experiments (noise floor, detection, voting, canonical
                     labeling, one solver per task); see mitigation/README.md
 tests/              pytest suite for the main pipeline
+tmp/                files probably no longer needed (the pilot config, unused model entries, a cost
+                    monitor); see tmp/README.md
 ```
 
 ## Running the pipeline from scratch
 
-This calls paid model APIs. The published run used the Hugging Face Inference Providers router. Copy `.env.example` to `.env` and set `HF_TOKEN`; the models and providers are in `configs/models.yaml`.
+This calls paid model APIs. The published run used the Hugging Face Inference Providers router. Copy `.env.example` to `.env` and set `HF_TOKEN`; the models and providers are in `configs/models.yaml`. Install with `pip install -e ".[dev,erdos]"`. `scripts/run_model.sh <model>` runs every stage of both datasets and of the Erdős M3 rerun for one model.
 
 ```bash
 python scripts/run.py --config configs/smoke.yaml --models stub     # offline end-to-end check with a stub model
@@ -76,7 +80,9 @@ python scripts/run.py --config configs/graphqa.yaml --models hf-qwen3-8b-nscale 
 python scripts/analyze.py --config configs/graphqa.yaml
 ```
 
-Replies are cached under `results/cache/<model>/<prompt_hash>.json`, and every stage resumes where it stopped. The `data` stage rebuilds `data/processed/<dataset>/instances.jsonl`. It is not needed, because the instances are committed; for Erdős it downloads `PKU-ML/Erdos`.
+Replies are cached under `results/cache/<model>/<prompt_hash>.json`, and every stage resumes where it stopped. A stored reply whose prompt has changed is asked again. The `data` stage keeps the committed `data/processed/<dataset>/instances.jsonl`. `--rebuild-data` regenerates it, but GraphQA's SBM graphs come out different under networkx 3.7 or later, and Erdős is downloaded from `PKU-ML/Erdos` at a pinned revision.
+
+The published records were produced by this pipeline before the fixes listed in the commit history (execution retries a timeout, gives programs an empty stdin, and keys its cache on the limits). None of them changes a prompt: every published record's prompt rebuilds with the same hash.
 
 ## Data sources
 
