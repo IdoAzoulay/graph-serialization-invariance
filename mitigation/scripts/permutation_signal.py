@@ -25,8 +25,6 @@ that returned a parsable answer -- the silent errors a detector is for.
 from __future__ import annotations
 
 import argparse
-import itertools
-import json
 from collections import Counter, defaultdict
 from pathlib import Path
 

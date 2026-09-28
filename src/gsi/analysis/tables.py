@@ -13,6 +13,7 @@ NUMERIC = ("int", "float")
 KEYS = ["dataset", "task", "mode", "library", "axis", "model"]
 NO_LIBRARY = "-"
 RUNG_ORDER = ["prose", "plain", "json", "networkx_code", "injected"]
+CLASS_ORDER = ["transcription", "construction", "logic", "no_computation", "execution", "format", "unverifiable"]
 PROSE_SYNTAXES = ("graphqa_nl", "erdos_nl")
 
 
@@ -111,9 +112,8 @@ def ladder_table(df: pd.DataFrame) -> pd.DataFrame:
     if sub.empty:
         return pd.DataFrame()
     sub["rung"] = sub.apply(_rung, axis=1)
-    classes = ["transcription", "construction", "logic", "no_computation", "execution", "format", "unverifiable"]
     agg = {"accuracy": ("correct", "mean"), "n": ("correct", "size")}
-    for c in classes:
+    for c in CLASS_ORDER:
         agg[c] = ("failure_class", lambda s, c=c: (s == c).mean())
     out = sub.groupby(["dataset", "mode", "library", "rung", "model"]).agg(**agg).reset_index()
     out["rung_order"] = out["rung"].map({r: i for i, r in enumerate(RUNG_ORDER)}).fillna(99)

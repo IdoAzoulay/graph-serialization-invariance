@@ -15,8 +15,9 @@ depends on the label values (e.g. breaking ties by the smallest label) can still
 which is part of what is measured. The sorted-identity form is a reference, not a perturbation,
 and is skipped. Agreement on one graph does not prove two programs equivalent on every graph.
 
-Then vote over the outputs; ties go to the canonical program's answer, as in answer voting
-(permutation_signal.py). Local execution only; no inference.
+Then vote over the outputs; a tie goes to the canonical program's answer when it is among the tied,
+otherwise to the smallest answer (answer voting in permutation_signal.py sends every tie to the
+canonical answer instead). Local execution only; no inference.
 
     python mitigation/scripts/program_voting.py --config configs/graphqa.yaml --models m1 m2 [--limit 300]
 

@@ -25,7 +25,6 @@ canonical form does.
 from __future__ import annotations
 
 import argparse
-import hashlib
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -33,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from gsi.data.base import GraphInstance, append_jsonl, read_jsonl
+from gsi.data.base import append_jsonl, read_jsonl
 from gsi.exec import sandbox
 from gsi.experiment.config import load_config, load_models
 from gsi.experiment.run import iter_arms, load_dotenv, load_instances, load_variants, make_client, score_record

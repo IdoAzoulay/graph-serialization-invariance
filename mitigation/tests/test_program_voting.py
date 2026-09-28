@@ -1,4 +1,4 @@
-"""E6 program voting (scripts/program_voting.py, loaded by path)."""
+"""E6 program voting (mitigation/scripts/program_voting.py, loaded by path)."""
 import importlib.util
 from pathlib import Path
 

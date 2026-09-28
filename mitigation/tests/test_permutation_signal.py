@@ -1,4 +1,4 @@
-"""E1/E2 permutation detection and voting (scripts/permutation_signal.py, loaded by path)."""
+"""E1/E2 permutation detection and voting (mitigation/scripts/permutation_signal.py, loaded by path)."""
 import importlib.util
 import json
 from pathlib import Path

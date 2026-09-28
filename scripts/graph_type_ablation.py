@@ -1,7 +1,7 @@
 """Ablation: what does a model assume when the serialization omits the graph type?
 
 For an undirected graph the Erdos graph-as-code (M3) prompt stated the graph type only if the task
-preamble did (docs/220926-erdos-m3-graph-type-rerun.md section 1). The rerun that states it for
+preamble did (paper, Section 5.5 and Appendix E). The rerun that states it for
 every undirected graph (`configs/erdos_m3fix.yaml`) turns that defect into a controlled
 one-sentence ablation: the same model, task, graph and template, with one fact present or absent.
 
@@ -14,9 +14,8 @@ Three questions, three tables under results/erdos_m3fix/tables/ablation/:
   latent_misreading.csv Did the model misread the input even where the answer was right? In the
                         NetworkX arm the sandbox recovers the graph the program built, so
                         `directedness_mismatch` is direct evidence of a DiGraph on undirected
-                        input. Cross-tabulated with correctness. Needs base-run records: Qwen3-8B
-                        and DeepSeek-V3.1 from the local run, Gemma 4 31B and DeepSeek-V4-Flash
-                        from the team dataset (results/hf_snapshot_yoni/).
+                        input. Cross-tabulated with correctness. Needs the base run's records
+                        (results/erdos/scored/, restored by scripts/restore_from_hf.py).
   recovery.csv          After the sentence is added: mismatch rate and accuracy, all four models.
 
 Graph direction is observed only where the sandbox recovered a graph object (`n_graphs` > 0): never
@@ -64,7 +63,7 @@ def recovered(df: pd.DataFrame) -> pd.Series:
 
 def base_accuracy_table(model: str) -> pd.DataFrame | None:
     """Canonical M3 accuracy per task/library from the base run's committed tables. A fallback for
-    a model whose base records are absent; with the team dataset restored, all four have records."""
+    a model whose base records are absent; the published records cover all four models."""
     p = ROOT / "results" / "erdos" / "tables" / model / "accuracy.csv"
     if not p.exists():
         return None
@@ -122,7 +121,7 @@ def task_sensitivity() -> pd.DataFrame:
         rows.append(t)
     out = pd.concat(rows, ignore_index=True)
     # An accuracy change does not say why it happened: single-program flips and re-asked prompts
-    # move tasks too (docs/220926-erdos-m3-graph-type-rerun.md section 4). Flag the size only.
+    # move tasks too (paper, Section 5.5). Flag the size only.
     out["accuracy_gain_gt_5pp"] = out["delta"] > 0.05
     cols = ["model", "library", "task", "base_source", "n_undirected", "acc_omitted", "acc_stated",
             "delta", "acc_omitted_undirected", "acc_stated_undirected", "delta_undirected", "accuracy_gain_gt_5pp"]

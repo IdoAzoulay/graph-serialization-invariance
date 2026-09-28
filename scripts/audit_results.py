@@ -15,17 +15,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from gsi.data.base import read_jsonl
+
 ROOT = Path(__file__).resolve().parents[1]
 PERMUTATIONS = ["relabel", "order"]
 ARMS = ["direct", "code/native", "code/networkx"]
 METRICS = ["identical", "all_correct", "identical_correct", "stable_wrong", "valid_different",
            "varying_error", "missing", "all_unparsed", "ref_correct", "ref_failure"]
-
-
-def read_rows(path):
-    with path.open(encoding="utf-8") as stream:
-        for line in stream:
-            yield json.loads(line)
 
 
 def per_instance(rows, instances):
@@ -123,9 +119,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     report, instances_all, intervals = [], [], []
     for dataset in ["graphqa", "erdos"]:
-        instances = {r["id"]: r for r in read_rows(ROOT / "data" / "processed" / dataset / "instances.jsonl")}
+        instances = {r["id"]: r for r in read_jsonl(ROOT / "data" / "processed" / dataset / "instances.jsonl")}
         for path in sorted((ROOT / "results" / dataset / "scored").glob("*.jsonl")):
-            rows = list(read_rows(path))
+            rows = list(read_jsonl(path))
             ids = [r["record_id"] for r in rows]
             assert len(ids) == len(set(ids)), f"Duplicate scored records in {path}"
             model = path.stem

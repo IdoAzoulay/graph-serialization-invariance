@@ -146,7 +146,7 @@ def invariance_by_axis(base: pd.DataFrame, fixed: pd.DataFrame, models: list[str
     keys = ["model", "library", "axis"]
     b = invariance_table(base[(base["mode"] == M3) & base["model"].isin(models)])
     f = invariance_table(fixed[fixed["mode"] == M3])
-    # task-averaged, as in ANALYSIS.md: every task weighs the same
+    # task-averaged: every task weighs the same
     b = b.groupby(keys)[["frac_identical", "frac_all_correct"]].mean().rename(
         columns={"frac_identical": "I_base", "frac_all_correct": "R_base"})
     f = f.groupby(keys)[["frac_identical", "frac_all_correct"]].mean().rename(

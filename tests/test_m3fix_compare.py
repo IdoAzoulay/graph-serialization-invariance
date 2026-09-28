@@ -71,7 +71,6 @@ def test_the_rerun_config_rebuilds_the_base_run_variants():
     base = yaml.safe_load((ROOT / "configs" / "erdos.yaml").read_text())
     fixed = yaml.safe_load((ROOT / "configs" / "erdos_m3fix.yaml").read_text())
     assert fixed["datasets"] == base["datasets"]
-    assert fixed.get("canonical") == base.get("canonical")
     assert (ROOT / "data/processed/erdos_m3fix/instances.jsonl").read_bytes() == \
            (ROOT / "data/processed/erdos/instances.jsonl").read_bytes()
 

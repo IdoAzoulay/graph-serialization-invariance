@@ -1,4 +1,4 @@
-"""E5 solver prompts (scripts/solver_per_task.py, loaded by path)."""
+"""E5 solver prompts (mitigation/scripts/solver_per_task.py, loaded by path)."""
 import importlib.util
 from pathlib import Path
 

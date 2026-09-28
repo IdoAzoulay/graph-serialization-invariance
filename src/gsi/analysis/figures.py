@@ -8,11 +8,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from gsi.analysis.tables import CLASS_ORDER, RUNG_ORDER
+
 MODE_ORDER = ["direct", "code", "graph_as_code"]
 AXIS_ORDER = ["canonical", "relabel", "order", "structure", "syntax"]
-RUNG_ORDER = ["prose", "plain", "json", "networkx_code", "injected"]
-CLASS_ORDER = ["transcription", "construction", "logic", "no_computation",
-               "execution", "format", "unverifiable"]
 
 
 def _order(values, order):

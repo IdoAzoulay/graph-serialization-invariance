@@ -1,4 +1,4 @@
-"""E3 canonical labeling as rendered prompts (scripts/canonical_labeling.py, loaded by path)."""
+"""E3 canonical labeling as rendered prompts (mitigation/scripts/canonical_labeling.py, loaded by path)."""
 import importlib.util
 from pathlib import Path
 

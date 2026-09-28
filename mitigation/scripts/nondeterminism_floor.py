@@ -7,7 +7,7 @@ permutation" number is only evidence about the permutation to the extent it exce
         --models m1 m2 --instances 100 --repeats 4 --out mitigation/results/graphqa/noise_floor.json
 
 Definitions match `gsi.analysis.tables.invariance_table`, which the first version of this script
-did not (see ANALYSIS.md section 5):
+did not:
   * k identical asks are compared the way an axis's forms are: they agree only if every answer
     parsed and all answer keys are equal. An unparsable reply counts as disagreement.
   * default k = 4, the number of forms `relabel` has per instance (identity + 3 seeds); `order`
