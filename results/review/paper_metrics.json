@@ -1,5 +1,5 @@
 {
- "notes": "The paper's metric set, computed from the scored records of all four models.\n\n    python scripts/paper_metrics.py [--scored-dir DIR ...]   ->  results/review/paper_metrics.json\n\nInputs\n  scored records, one file per dataset and model: <dir>/<dataset>/scored/<model>.jsonl (the repo's results/\n  layout) or <dir>/scored/<dataset>/<model>.jsonl[.gz] (the layout of the team's Hugging Face datasets). The\n  repo's results/ folder is searched first. Scored records are git-ignored; Qwen3-8B and DeepSeek-V3.1 come\n  from our own runs, Gemma 4 31B and DeepSeek-V4-Flash from the Yonibarel/graph-serialization-invariance\n  dataset (download its scored/ folder, for example to data/raw/hf/, and pass --scored-dir data/raw/hf).\n  data/processed/<dataset>/instances.jsonl gives the true answers, edge counts, graphs and graph ids.\n\nUnits\n  answer = one serialization of one instance, one model, one mode\n  tuple  = the reference serialization + one factor's variants (as in scripts/audit_results.py):\n           relabel -> the sorted identity + the relabelings; other factors -> canonical + that factor's variants\nSame-answer rules: node answers are compared after mapping back (answer_key); two correct answers are the\nsame answer; \"no answer\" (crash, timeout, unparseable) is an answer of its own.\n\nMetrics\n  performance  accuracy (no answer = wrong), robust accuracy (every serialization correct), drop vs reference\n  invariance   six buckets; flip rate (D > 0); D = share of serialization pairs that differ; severity = mean D\n               among flips; weighted flip rate = mean D; S = (max - min) / |truth| (numeric tasks, answered only)\n  localization (a) wrong M2 answers by first failed step, as shares among failures, with the failure rate\n               (b) flipped M2 tuples by where they diverge: copy / crash / program\n               (c) flip rate of M2 vs M3 on the same tuples, relabel and order only\n  also         flip rate by graph size, and whether flipped node-list answers take the other reading\nStatistics: McNemar (flip, code vs direct; M2 vs M3), Wilcoxon signed-rank (D, code vs direct), cluster\nbootstrap over graphs (headline rates, and the M1 / pooled-M2 rates per model drawn in the figures), logistic\nregressions clustered by graph. Datasets are never pooled.\n",
+ "notes": "The paper's metric set, computed from the scored records of all four models.\n\n    python scripts/paper_metrics.py [--out PATH]   ->  results/review/paper_metrics.json\n\nInputs\n  scored records, results/<dataset>/scored/<model>.jsonl (git-ignored; scripts/restore_from_hf.py writes them).\n  data/processed/<dataset>/instances.jsonl gives the true answers, edge counts, graphs and graph ids.\n\nUnits\n  answer = one serialization of one instance, one model, one mode\n  tuple  = the reference serialization + one factor's variants (as in scripts/audit_results.py):\n           relabel -> the sorted identity + the relabelings; other factors -> canonical + that factor's variants\nSame-answer rules: node answers are compared after mapping back (answer_key); two correct answers are the\nsame answer; \"no answer\" (crash, timeout, unparseable) is an answer of its own.\n\nMetrics\n  performance  accuracy (no answer = wrong), robust accuracy (every serialization correct), drop vs reference\n  invariance   six buckets; flip rate (D > 0); D = share of serialization pairs that differ; severity = mean D\n               among flips; weighted flip rate = mean D; S = (max - min) / |truth| over a flip's answered values\n               (flipped tuples of numeric tasks)\n  localization (a) wrong M2 answers by the first step that failed (copy -> solve -> run), as shares among\n                   the wrong answers, with their rate\n               (b) flipped M2 tuples by where they diverge: copy / crash / program\n               (c) flip rate of M2 vs M3 on the same tuples, relabel and order only\n  also         flip rate by graph size, and whether flipped node-list answers take the other reading\nStatistics: McNemar (flip, code vs direct; M2 vs M3), Wilcoxon signed-rank (D, code vs direct), cluster\nbootstrap over graphs (headline rates, and the M1 / pooled-M2 rates per model drawn in the figures), logistic\nregressions clustered by graph, one per dataset. Datasets are never pooled. McNemar and Wilcoxon treat a\nmodel's tuples as independent pairs; tuples of one graph are not.\n",
  "invariance": {
   "erdos|code/native|order": {
    "tuples": 4800,
@@ -14,9 +14,9 @@
     "flip_with_crash": 0.9,
     "same_wrong": 0.6
    },
-   "S_n": 89,
-   "S_median": 0.18,
-   "S_doubling_pct": 6.7,
+   "S_n": 79,
+   "S_median": 0.2,
+   "S_doubling_pct": 7.6,
    "one_off_pct_of_4member_flips": 78.5,
    "all_different_pct_of_4member_flips": 0.6
   },
@@ -33,9 +33,9 @@
     "flip_with_crash": 0.8,
     "same_wrong": 0.6
    },
-   "S_n": 78,
-   "S_median": 0.33,
-   "S_doubling_pct": 5.1,
+   "S_n": 73,
+   "S_median": 0.39,
+   "S_doubling_pct": 5.5,
    "one_off_pct_of_4member_flips": 80.2,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -52,9 +52,9 @@
     "flip_with_crash": 0.9,
     "same_wrong": 0.6
    },
-   "S_n": 167,
-   "S_median": 0.23,
-   "S_doubling_pct": 6.0,
+   "S_n": 152,
+   "S_median": 0.25,
+   "S_doubling_pct": 6.6,
    "one_off_pct_of_4member_flips": 79.4,
    "all_different_pct_of_4member_flips": 0.3
   },
@@ -71,9 +71,9 @@
     "different_all_correct": 1.0,
     "same_wrong": 0.2
    },
-   "S_n": 430,
+   "S_n": 415,
    "S_median": 1.0,
-   "S_doubling_pct": 47.0,
+   "S_doubling_pct": 48.7,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -90,9 +90,9 @@
     "same_wrong": 0.8,
     "different_all_correct": 0.1
    },
-   "S_n": 54,
-   "S_median": 0.23,
-   "S_doubling_pct": 9.3,
+   "S_n": 49,
+   "S_median": 0.25,
+   "S_doubling_pct": 10.2,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -110,9 +110,9 @@
     "flip_all_answered": 0.9,
     "same_wrong": 0.3
    },
-   "S_n": 41,
-   "S_median": 0.14,
-   "S_doubling_pct": 7.3,
+   "S_n": 36,
+   "S_median": 0.19,
+   "S_doubling_pct": 8.3,
    "one_off_pct_of_4member_flips": 71.9,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -130,9 +130,9 @@
     "flip_all_answered": 0.9,
     "same_wrong": 0.3
    },
-   "S_n": 30,
-   "S_median": 0.24,
-   "S_doubling_pct": 20.0,
+   "S_n": 26,
+   "S_median": 0.25,
+   "S_doubling_pct": 23.1,
    "one_off_pct_of_4member_flips": 73.2,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -150,9 +150,9 @@
     "flip_all_answered": 0.9,
     "same_wrong": 0.3
    },
-   "S_n": 71,
-   "S_median": 0.18,
-   "S_doubling_pct": 12.7,
+   "S_n": 62,
+   "S_median": 0.22,
+   "S_doubling_pct": 14.5,
    "one_off_pct_of_4member_flips": 72.6,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -170,9 +170,9 @@
     "different_all_correct": 0.9,
     "same_wrong": 0.2
    },
-   "S_n": 221,
+   "S_n": 210,
    "S_median": 1.0,
-   "S_doubling_pct": 32.1,
+   "S_doubling_pct": 33.8,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -190,9 +190,9 @@
     "different_all_correct": 0.1,
     "same_wrong": 0.0
    },
-   "S_n": 25,
-   "S_median": 0.25,
-   "S_doubling_pct": 12.0,
+   "S_n": 22,
+   "S_median": 0.33,
+   "S_doubling_pct": 13.6,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -209,9 +209,9 @@
     "flip_with_crash": 3.3,
     "same_wrong": 0.5
    },
-   "S_n": 521,
-   "S_median": 0.25,
-   "S_doubling_pct": 8.8,
+   "S_n": 481,
+   "S_median": 0.29,
+   "S_doubling_pct": 9.6,
    "one_off_pct_of_4member_flips": 41.7,
    "all_different_pct_of_4member_flips": 21.1
   },
@@ -229,9 +229,9 @@
     "same_wrong": 0.5,
     "no_answer_all": 0.1
    },
-   "S_n": 578,
-   "S_median": 0.31,
-   "S_doubling_pct": 11.9,
+   "S_n": 541,
+   "S_median": 0.33,
+   "S_doubling_pct": 12.8,
    "one_off_pct_of_4member_flips": 41.6,
    "all_different_pct_of_4member_flips": 21.5
   },
@@ -249,9 +249,9 @@
     "same_wrong": 0.5,
     "no_answer_all": 0.0
    },
-   "S_n": 1099,
-   "S_median": 0.29,
-   "S_doubling_pct": 10.5,
+   "S_n": 1022,
+   "S_median": 0.33,
+   "S_doubling_pct": 11.3,
    "one_off_pct_of_4member_flips": 41.6,
    "all_different_pct_of_4member_flips": 21.3
   },
@@ -269,9 +269,9 @@
     "same_wrong": 0.5,
     "no_answer_all": 0.0
    },
-   "S_n": 602,
-   "S_median": 0.25,
-   "S_doubling_pct": 9.3,
+   "S_n": 541,
+   "S_median": 0.3,
+   "S_doubling_pct": 10.4,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -289,9 +289,9 @@
     "same_wrong": 0.7,
     "no_answer_all": 0.0
    },
-   "S_n": 524,
-   "S_median": 0.25,
-   "S_doubling_pct": 7.1,
+   "S_n": 482,
+   "S_median": 0.29,
+   "S_doubling_pct": 7.7,
    "one_off_pct_of_4member_flips": 0.0,
    "all_different_pct_of_4member_flips": 0.0
   },
@@ -774,15 +774,15 @@
    "failures": 85,
    "failure_rate": 1.8,
    "shares_among_failures": {
-    "copy": 3.5,
+    "copy": 7.1,
     "solve": 77.6,
-    "run": 18.8,
+    "run": 15.3,
     "other": 0.0
    },
    "counts": {
-    "copy": 3,
+    "copy": 6,
     "solve": 66,
-    "run": 16,
+    "run": 13,
     "other": 0
    }
   },
@@ -791,15 +791,15 @@
    "failures": 653,
    "failure_rate": 2.0,
    "shares_among_failures": {
-    "copy": 8.4,
+    "copy": 9.6,
     "solve": 78.6,
-    "run": 12.4,
+    "run": 11.2,
     "other": 0.6
    },
    "counts": {
-    "copy": 55,
+    "copy": 63,
     "solve": 513,
-    "run": 81,
+    "run": 73,
     "other": 4
    }
   },
@@ -808,15 +808,15 @@
    "failures": 783,
    "failure_rate": 8.4,
    "shares_among_failures": {
-    "copy": 10.3,
+    "copy": 11.2,
     "solve": 80.6,
-    "run": 4.1,
+    "run": 3.2,
     "other": 5.0
    },
    "counts": {
-    "copy": 81,
+    "copy": 88,
     "solve": 631,
-    "run": 32,
+    "run": 25,
     "other": 39
    }
   },
@@ -859,33 +859,33 @@
    "failures": 2455,
    "failure_rate": 7.4,
    "shares_among_failures": {
-    "copy": 1.5,
+    "copy": 2.1,
     "solve": 8.6,
-    "run": 88.4,
+    "run": 87.8,
     "other": 1.5
    },
    "counts": {
-    "copy": 38,
+    "copy": 52,
     "solve": 211,
-    "run": 2169,
+    "run": 2155,
     "other": 37
    }
   },
   "erdos|networkx|structure": {
    "answers": 9292,
-   "failures": 1024,
+   "failures": 1023,
    "failure_rate": 11.0,
    "shares_among_failures": {
-    "copy": 7.5,
-    "solve": 23.8,
-    "run": 64.8,
-    "other": 3.8
+    "copy": 13.1,
+    "solve": 23.9,
+    "run": 59.3,
+    "other": 3.7
    },
    "counts": {
-    "copy": 77,
+    "copy": 134,
     "solve": 244,
-    "run": 664,
-    "other": 39
+    "run": 607,
+    "other": 38
    }
   },
   "erdos|networkx|syntax": {
@@ -893,50 +893,50 @@
    "failures": 1276,
    "failure_rate": 13.3,
    "shares_among_failures": {
-    "copy": 0.1,
+    "copy": 0.5,
     "solve": 2.0,
-    "run": 97.8,
+    "run": 97.4,
     "other": 0.1
    },
    "counts": {
-    "copy": 1,
+    "copy": 6,
     "solve": 26,
-    "run": 1248,
+    "run": 1243,
     "other": 1
    }
   },
   "graphqa|native|reference": {
    "answers": 2800,
-   "failures": 277,
+   "failures": 276,
    "failure_rate": 9.9,
    "shares_among_failures": {
     "copy": 2.2,
-    "solve": 97.5,
+    "solve": 97.8,
     "run": 0.0,
-    "other": 0.4
+    "other": 0.0
    },
    "counts": {
     "copy": 6,
     "solve": 270,
     "run": 0,
-    "other": 1
+    "other": 0
    }
   },
   "graphqa|native|relabel+order": {
    "answers": 18900,
-   "failures": 1977,
-   "failure_rate": 10.5,
+   "failures": 1973,
+   "failure_rate": 10.4,
    "shares_among_failures": {
     "copy": 1.4,
-    "solve": 98.3,
+    "solve": 98.5,
     "run": 0.1,
-    "other": 0.3
+    "other": 0.1
    },
    "counts": {
     "copy": 27,
     "solve": 1944,
     "run": 1,
-    "other": 5
+    "other": 1
    }
   },
   "graphqa|native|structure": {
@@ -975,70 +975,70 @@
   },
   "graphqa|networkx|reference": {
    "answers": 2800,
-   "failures": 306,
+   "failures": 304,
    "failure_rate": 10.9,
    "shares_among_failures": {
     "copy": 1.6,
-    "solve": 92.5,
+    "solve": 93.1,
     "run": 2.3,
-    "other": 3.6
+    "other": 3.0
    },
    "counts": {
     "copy": 5,
     "solve": 283,
     "run": 7,
-    "other": 11
+    "other": 9
    }
   },
   "graphqa|networkx|relabel+order": {
    "answers": 18900,
-   "failures": 2113,
-   "failure_rate": 11.2,
+   "failures": 2104,
+   "failure_rate": 11.1,
    "shares_among_failures": {
     "copy": 1.7,
-    "solve": 93.0,
+    "solve": 93.4,
     "run": 2.9,
-    "other": 2.4
+    "other": 2.0
    },
    "counts": {
     "copy": 35,
     "solve": 1965,
     "run": 62,
-    "other": 51
+    "other": 42
    }
   },
   "graphqa|networkx|structure": {
    "answers": 5600,
-   "failures": 576,
-   "failure_rate": 10.3,
+   "failures": 570,
+   "failure_rate": 10.2,
    "shares_among_failures": {
-    "copy": 2.8,
-    "solve": 88.9,
-    "run": 6.2,
-    "other": 2.1
+    "copy": 3.0,
+    "solve": 89.8,
+    "run": 6.1,
+    "other": 1.1
    },
    "counts": {
-    "copy": 16,
+    "copy": 17,
     "solve": 512,
-    "run": 36,
-    "other": 12
+    "run": 35,
+    "other": 6
    }
   },
   "graphqa|networkx|syntax": {
    "answers": 8400,
-   "failures": 1016,
+   "failures": 1014,
    "failure_rate": 12.1,
    "shares_among_failures": {
-    "copy": 0.0,
-    "solve": 72.8,
+    "copy": 0.1,
+    "solve": 73.0,
     "run": 24.7,
-    "other": 2.5
+    "other": 2.3
    },
    "counts": {
-    "copy": 0,
+    "copy": 1,
     "solve": 740,
-    "run": 251,
-    "other": 25
+    "run": 250,
+    "other": 23
    }
   }
  },
@@ -1145,9 +1145,9 @@
   },
   "erdos|code/native|structure": {
    "flips": 658,
-   "program": 77.2,
-   "crash": 9.3,
-   "copy": 13.5
+   "program": 78.3,
+   "crash": 9.4,
+   "copy": 12.3
   },
   "erdos|code/native|syntax": {
    "flips": 184,
@@ -1176,8 +1176,8 @@
   "erdos|code/networkx|structure": {
    "flips": 489,
    "program": 37.0,
-   "crash": 42.3,
-   "copy": 20.7
+   "crash": 44.0,
+   "copy": 19.0
   },
   "erdos|code/networkx|syntax": {
    "flips": 795,
@@ -1205,9 +1205,9 @@
   },
   "graphqa|code/native|structure": {
    "flips": 518,
-   "program": 95.9,
+   "program": 96.3,
    "crash": 1.0,
-   "copy": 3.1
+   "copy": 2.7
   },
   "graphqa|code/native|syntax": {
    "flips": 135,
@@ -1235,9 +1235,9 @@
   },
   "graphqa|code/networkx|structure": {
    "flips": 224,
-   "program": 70.5,
+   "program": 71.0,
    "crash": 21.4,
-   "copy": 8.0
+   "copy": 7.6
   },
   "graphqa|code/networkx|syntax": {
    "flips": 381,
@@ -1879,35 +1879,70 @@
   }
  },
  "logit_flip": {
-  "C(arm, Treatment('direct'))[T.code/native]": [
-   0.27,
-   0.25,
-   0.3
-  ],
-  "C(arm, Treatment('direct'))[T.code/networkx]": [
-   0.37,
-   0.34,
-   0.42
-  ],
-  "C(axis, Treatment('relabel'))[T.order]": [
-   0.85,
-   0.81,
-   0.89
-  ],
-  "C(axis, Treatment('relabel'))[T.structure]": [
-   1.85,
-   1.73,
-   1.96
-  ],
-  "C(axis, Treatment('relabel'))[T.syntax]": [
-   1.43,
-   1.35,
-   1.52
-  ]
+  "graphqa": {
+   "C(arm, Treatment('direct'))[T.code/native]": [
+    0.47,
+    0.41,
+    0.54
+   ],
+   "C(arm, Treatment('direct'))[T.code/networkx]": [
+    0.52,
+    0.44,
+    0.61
+   ],
+   "C(axis, Treatment('relabel'))[T.order]": [
+    0.81,
+    0.74,
+    0.89
+   ],
+   "C(axis, Treatment('relabel'))[T.structure]": [
+    2.18,
+    1.99,
+    2.39
+   ],
+   "C(axis, Treatment('relabel'))[T.syntax]": [
+    1.42,
+    1.29,
+    1.56
+   ]
+  },
+  "erdos": {
+   "C(arm, Treatment('direct'))[T.code/native]": [
+    0.2,
+    0.17,
+    0.22
+   ],
+   "C(arm, Treatment('direct'))[T.code/networkx]": [
+    0.31,
+    0.27,
+    0.36
+   ],
+   "C(axis, Treatment('relabel'))[T.order]": [
+    0.87,
+    0.82,
+    0.92
+   ],
+   "C(axis, Treatment('relabel'))[T.structure]": [
+    1.68,
+    1.55,
+    1.83
+   ],
+   "C(axis, Treatment('relabel'))[T.syntax]": [
+    1.45,
+    1.35,
+    1.56
+   ]
+  }
  },
  "logit_flip_n": {
-  "tuples": 91068,
-  "clusters": 1279
+  "graphqa": {
+   "tuples": 33468,
+   "clusters": 100
+  },
+  "erdos": {
+   "tuples": 57600,
+   "clusters": 1179
+  }
  },
  "severity_profile_4member_relabel+order": {
   "erdos|code/native": {
@@ -1961,93 +1996,93 @@
  },
  "S_quartiles": {
   "erdos|code/native|order": {
-   "n": 89,
-   "q1": 0.08,
-   "median": 0.18,
-   "q3": 0.33
+   "n": 79,
+   "q1": 0.14,
+   "median": 0.2,
+   "q3": 0.34
   },
   "erdos|code/native|relabel": {
-   "n": 78,
-   "q1": 0.15,
-   "median": 0.33,
-   "q3": 0.48
+   "n": 73,
+   "q1": 0.2,
+   "median": 0.39,
+   "q3": 0.49
   },
   "erdos|code/native|relabel+order": {
-   "n": 167,
-   "q1": 0.12,
-   "median": 0.23,
-   "q3": 0.44
+   "n": 152,
+   "q1": 0.14,
+   "median": 0.25,
+   "q3": 0.45
   },
   "erdos|code/native|structure": {
-   "n": 430,
-   "q1": 0.88,
+   "n": 415,
+   "q1": 1.0,
    "median": 1.0,
    "q3": 1.0
   },
   "erdos|code/native|syntax": {
-   "n": 54,
-   "q1": 0.14,
-   "median": 0.23,
+   "n": 49,
+   "q1": 0.18,
+   "median": 0.25,
    "q3": 0.34
   },
   "erdos|code/networkx|order": {
-   "n": 41,
-   "q1": 0.06,
-   "median": 0.14,
-   "q3": 0.33
+   "n": 36,
+   "q1": 0.07,
+   "median": 0.19,
+   "q3": 0.36
   },
   "erdos|code/networkx|relabel": {
-   "n": 30,
-   "q1": 0.04,
-   "median": 0.24,
+   "n": 26,
+   "q1": 0.08,
+   "median": 0.25,
    "q3": 0.5
   },
   "erdos|code/networkx|relabel+order": {
-   "n": 71,
-   "q1": 0.06,
-   "median": 0.18,
-   "q3": 0.43
+   "n": 62,
+   "q1": 0.07,
+   "median": 0.22,
+   "q3": 0.47
   },
   "erdos|code/networkx|structure": {
-   "n": 221,
-   "q1": 0.08,
+   "n": 210,
+   "q1": 0.14,
    "median": 1.0,
    "q3": 1.0
   },
   "erdos|code/networkx|syntax": {
-   "n": 25,
-   "q1": 0.08,
-   "median": 0.25,
-   "q3": 0.47
+   "n": 22,
+   "q1": 0.16,
+   "median": 0.33,
+   "q3": 0.48
   },
   "erdos|direct|order": {
-   "n": 521,
-   "q1": 0.12,
-   "median": 0.25,
-   "q3": 0.5
-  },
-  "erdos|direct|relabel": {
-   "n": 578,
+   "n": 481,
    "q1": 0.14,
-   "median": 0.31,
-   "q3": 0.5
-  },
-  "erdos|direct|relabel+order": {
-   "n": 1099,
-   "q1": 0.12,
    "median": 0.29,
    "q3": 0.5
   },
+  "erdos|direct|relabel": {
+   "n": 541,
+   "q1": 0.17,
+   "median": 0.33,
+   "q3": 0.51
+  },
+  "erdos|direct|relabel+order": {
+   "n": 1022,
+   "q1": 0.15,
+   "median": 0.33,
+   "q3": 0.51
+  },
   "erdos|direct|structure": {
-   "n": 602,
-   "q1": 0.1,
-   "median": 0.25,
-   "q3": 0.67
+   "n": 541,
+   "q1": 0.14,
+   "median": 0.3,
+   "q3": 0.71
   },
   "erdos|direct|syntax": {
-   "n": 524,
-   "q1": 0.12,
-   "median": 0.25,
+   "n": 482,
+   "q1": 0.15,
+   "median": 0.29,
    "q3": 0.5
   },
   "graphqa|code/native|order": {
@@ -2264,21 +2299,40 @@
   }
  },
  "flip_odds_ratio_per_doubling_of_edges": {
-  "direct": [
-   2.06,
-   1.91,
-   2.22
-  ],
-  "code/native": [
-   1.19,
-   1.08,
-   1.31
-  ],
-  "code/networkx": [
-   0.92,
-   0.85,
-   1.0
-  ]
+  "graphqa": {
+   "direct": [
+    1.6,
+    1.46,
+    1.74
+   ],
+   "code/native": [
+    0.96,
+    0.86,
+    1.08
+   ],
+   "code/networkx": [
+    0.89,
+    0.8,
+    0.99
+   ]
+  },
+  "erdos": {
+   "direct": [
+    2.44,
+    2.19,
+    2.71
+   ],
+   "code/native": [
+    1.52,
+    1.34,
+    1.72
+   ],
+   "code/networkx": [
+    1.02,
+    0.91,
+    1.15
+   ]
+  }
  },
  "within_task_rise_largest_vs_smallest_third": {
   "direct": {
@@ -2294,52 +2348,50 @@
  },
  "other_reading_code_flips": {
   "erdos|neighbor|hf-deepseek-v3.1-novita": {
-   "other": 0,
-   "readings coincide": 0,
-   "strict subset of true neighbours": 4,
-   "takes the other reading": 0
+   "flips": 4,
+   "with_crash": 0,
+   "strict subset of true neighbours": 4
   },
   "erdos|neighbor|hf-qwen3-8b-nscale": {
-   "other": 0,
-   "readings coincide": 0,
-   "strict subset of true neighbours": 76,
-   "takes the other reading": 0
+   "flips": 102,
+   "with_crash": 18,
+   "strict subset of true neighbours": 85,
+   "other": 17
   },
   "graphqa|connected_nodes|hf-deepseek-v3.1-novita": {
-   "other": 11,
-   "readings coincide": 0,
-   "strict subset of true neighbours": 0,
-   "takes the other reading": 27
+   "flips": 42,
+   "with_crash": 0,
+   "takes the other reading": 28,
+   "other": 14
   },
   "graphqa|connected_nodes|hf-deepseek-v4-flash": {
-   "other": 50,
-   "readings coincide": 2,
-   "strict subset of true neighbours": 0,
-   "takes the other reading": 133
+   "flips": 201,
+   "with_crash": 0,
+   "takes the other reading": 147,
+   "other": 52,
+   "readings coincide": 2
   },
   "graphqa|connected_nodes|hf-qwen3-8b-nscale": {
-   "other": 0,
-   "readings coincide": 2,
-   "strict subset of true neighbours": 0,
-   "takes the other reading": 0
+   "flips": 2,
+   "with_crash": 0,
+   "readings coincide": 2
   },
   "graphqa|disconnected_nodes|hf-deepseek-v3.1-novita": {
-   "other": 0,
-   "readings coincide": 0,
-   "strict subset of true neighbours": 0,
+   "flips": 2,
+   "with_crash": 0,
    "takes the other reading": 2
   },
   "graphqa|disconnected_nodes|hf-gemma-4-31b": {
-   "other": 0,
-   "readings coincide": 0,
-   "strict subset of true neighbours": 0,
-   "takes the other reading": 107
+   "flips": 117,
+   "with_crash": 0,
+   "takes the other reading": 117
   },
   "graphqa|disconnected_nodes|hf-qwen3-8b-nscale": {
-   "other": 42,
-   "readings coincide": 10,
-   "strict subset of true neighbours": 0,
-   "takes the other reading": 99
+   "flips": 167,
+   "with_crash": 6,
+   "takes the other reading": 104,
+   "other": 45,
+   "readings coincide": 18
   }
  },
  "figure_intervals_relabel+order": {

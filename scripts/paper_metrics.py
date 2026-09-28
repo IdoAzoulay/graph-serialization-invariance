@@ -1,13 +1,9 @@
 """The paper's metric set, computed from the scored records of all four models.
 
-    python scripts/paper_metrics.py [--scored-dir DIR ...]   ->  results/review/paper_metrics.json
+    python scripts/paper_metrics.py [--out PATH]   ->  results/review/paper_metrics.json
 
 Inputs
-  scored records, one file per dataset and model: <dir>/<dataset>/scored/<model>.jsonl (the repo's results/
-  layout) or <dir>/scored/<dataset>/<model>.jsonl[.gz] (the layout of the team's Hugging Face datasets). The
-  repo's results/ folder is searched first. Scored records are git-ignored; Qwen3-8B and DeepSeek-V3.1 come
-  from our own runs, Gemma 4 31B and DeepSeek-V4-Flash from the Yonibarel/graph-serialization-invariance
-  dataset (download its scored/ folder, for example to data/raw/hf/, and pass --scored-dir data/raw/hf).
+  scored records, results/<dataset>/scored/<model>.jsonl (git-ignored; scripts/restore_from_hf.py writes them).
   data/processed/<dataset>/instances.jsonl gives the true answers, edge counts, graphs and graph ids.
 
 Units
@@ -20,20 +16,21 @@ same answer; "no answer" (crash, timeout, unparseable) is an answer of its own.
 Metrics
   performance  accuracy (no answer = wrong), robust accuracy (every serialization correct), drop vs reference
   invariance   six buckets; flip rate (D > 0); D = share of serialization pairs that differ; severity = mean D
-               among flips; weighted flip rate = mean D; S = (max - min) / |truth| (numeric tasks, answered only)
-  localization (a) wrong M2 answers by first failed step, as shares among failures, with the failure rate
+               among flips; weighted flip rate = mean D; S = (max - min) / |truth| over a flip's answered values
+               (flipped tuples of numeric tasks)
+  localization (a) wrong M2 answers by the first step that failed (copy -> solve -> run), as shares among
+                   the wrong answers, with their rate
                (b) flipped M2 tuples by where they diverge: copy / crash / program
                (c) flip rate of M2 vs M3 on the same tuples, relabel and order only
   also         flip rate by graph size, and whether flipped node-list answers take the other reading
 Statistics: McNemar (flip, code vs direct; M2 vs M3), Wilcoxon signed-rank (D, code vs direct), cluster
 bootstrap over graphs (headline rates, and the M1 / pooled-M2 rates per model drawn in the figures), logistic
-regressions clustered by graph. Datasets are never pooled.
+regressions clustered by graph, one per dataset. Datasets are never pooled. McNemar and Wilcoxon treat a
+model's tuples as independent pairs; tuples of one graph are not.
 """
 import argparse
-import gzip
 import json
 import math
-from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
@@ -44,6 +41,8 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import binomtest, wilcoxon
 from statsmodels.stats.multitest import multipletests
+
+from gsi.analysis.tuples import READING_TASKS, divergence_site, failure_step, reading_tag, spread
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ["graphqa", "erdos"]
@@ -57,25 +56,16 @@ NUMERIC = {"node_degree", "node_count", "edge_count", "triangles", "degree", "ed
            "connected_component_number", "diameter", "density"}
 
 ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-ap.add_argument("--scored-dir", action="append", default=[], help="extra folder holding scored records")
 ap.add_argument("--out", default=str(ROOT / "results/review/paper_metrics.json"))
 args = ap.parse_args()
-
-
-def scored_file(ds, model):
-    for base in [ROOT / "results"] + [Path(d) for d in args.scored_dir]:
-        for p in [base / ds / "scored" / f"{model}.jsonl", base / "scored" / ds / f"{model}.jsonl",
-                  base / "scored" / ds / f"{model}.jsonl.gz"]:
-            if p.exists():
-                return p
-    raise SystemExit(f"no scored records for {ds}/{model}; pass --scored-dir (see the docstring)")
-
 
 rows = []
 for ds in DATASETS:
     for m in MODELS:
-        p = scored_file(ds, m)
-        with (gzip.open(p, "rt") if p.suffix == ".gz" else open(p)) as fh:
+        p = ROOT / "results" / ds / "scored" / f"{m}.jsonl"
+        if not p.exists():
+            raise SystemExit(f"no scored records at {p}; run scripts/restore_from_hf.py")
+        with open(p) as fh:
             rows += [{k: r.get(k) for k in COLS} for r in map(json.loads, fh)]
 j = pd.DataFrame(rows)
 j["arm"] = np.where(j["mode"] == "direct", "direct", j["mode"] + "/" + j["library"].astype(str))
@@ -101,7 +91,7 @@ def num(x):
 
 
 # ---------------------------------------------------------------- tuples
-rows = []
+rows, reading = [], []  # reading: flipped code tuples of the node-list tasks (the "other reading" analysis)
 for (iid, model, arm), g in j.groupby(["instance_id", "model", "arm"], sort=False):
     canon = g[g["axis"] == "canonical"]
     ds, task = g["dataset"].iat[0], g["task"].iat[0]
@@ -134,27 +124,19 @@ for (iid, model, arm), g in j.groupby(["instance_id", "model", "arm"], sort=Fals
         else:
             bucket = "flip_with_crash"
         assert flip == (bucket in ("flip_all_answered", "flip_with_crash")), (iid, arm, axis, vals)
-        # S: numeric tasks, answered values only
+        # S: how far apart a flip's answers are; flipped tuples of numeric tasks, answered values only
         S = doubled = None
-        if task in NUMERIC:
-            xs = [num(k) for k in keys if k != "NA"]
-            xs = [x for x in xs if x is not None]
-            t = num(truth.get(iid))
-            if len(set(xs)) >= 2 and t is not None:
-                S = (max(xs) - min(xs)) / (abs(t) if t != 0 else 1.0)
-                doubled = min(xs) > 0 and abs(max(xs) - 2 * min(xs)) < 1e-9
+        if flip and task in NUMERIC:
+            xs = [x for x in (num(k) for k in keys if k != "NA") if x is not None]
+            S, doubled = spread(xs, num(truth.get(iid)))
         # (b) where a flipped M2 tuple diverges
         where = None
         if flip and arm.startswith("code/"):
             bad = (sub["declared_ok"] == False).tolist()  # noqa: E712  (None = not known to be wrong)
-            good_vals = [v for v, b in zip(vals, bad) if not b]
-            mode_good = Counter(good_vals).most_common(1)[0][0] if good_vals else None
-            if any(b and v != mode_good for v, b in zip(vals, bad)):
-                where = "copy"
-            elif not all_answered:
-                where = "crash"
-            else:
-                where = "program"
+            where = divergence_site(vals, bad, all_answered)
+        if flip and arm.startswith("code/") and axis in ("relabel", "order") and task in READING_TASKS:
+            reading.append(dict(dataset=ds, task=task, model=model, instance_id=iid, with_crash=not all_answered,
+                                answers=[json.loads(k) for k in keys if k != "NA"]))
         rows.append(dict(dataset=ds, task=task, instance_id=iid, cluster=cluster.get(iid, iid), model=model,
                          arm=arm, axis=axis, n=n, bucket=bucket, flip=flip, D=D, robust=all(corr),
                          S=S, doubled=doubled, where=where))
@@ -209,9 +191,8 @@ out["performance"] = perf
 
 # ---------------------------------------------------------------- localization (a)
 CODE = j[j["mode"] == "code"].copy()
-CODE["step"] = CODE.failure_class.map({"ok": None, "execution": "run", "transcription": "copy", "logic": "solve",
-                                 "construction": "solve", "format": "other", "no_computation": "other",
-                                 "unverifiable": "other"})
+# A failure is a wrong answer (as in accuracy), assigned the first step that failed (copy -> solve -> run)
+CODE["step"] = [failure_step(fc, dok, c) for fc, dok, c in zip(CODE.failure_class, CODE.declared_ok, CODE.correct)]
 CODE["factor"] = CODE.axis.replace({"canonical": "reference", "relabel": "relabel+order", "order": "relabel+order"})
 loc_a = {}
 for (ds, lib, fac), g in CODE.groupby(["dataset", "library", "factor"]):
@@ -302,14 +283,16 @@ for ds, g in RO.groupby("dataset"):
 out["bootstrap_95ci_relabel+order"] = boot
 
 # ---------------------------------------------------------------- logistic regression (flip), clustered by graph
-L = M12.assign(task_ds=M12.dataset + ":" + M12.task, y=M12.flip.astype(int))
-cl_codes = pd.factorize(L.cluster)[0]
-fit = smf.glm("y ~ C(arm, Treatment('direct')) + C(axis, Treatment('relabel')) + C(model) + C(task_ds)", data=L,
-              family=sm.families.Binomial()).fit(cov_type="cluster", cov_kwds={"groups": cl_codes})
-ci = fit.conf_int()
-out["logit_flip"] = {k: [round(float(np.exp(fit.params[k])), 2), round(float(np.exp(ci.loc[k, 0])), 2),
-                         round(float(np.exp(ci.loc[k, 1])), 2)] for k in fit.params.index if "arm" in k or "axis" in k}
-out["logit_flip_n"] = dict(tuples=int(len(L)), clusters=int(L.cluster.nunique()))
+# One model per dataset (datasets are never pooled). Main effects only: a factor's odds ratio is averaged
+# over the modes, and a mode's over the factors.
+out["logit_flip"], out["logit_flip_n"] = {}, {}
+for ds, L in M12.assign(y=M12.flip.astype(int)).groupby("dataset", sort=False):
+    fit = smf.glm("y ~ C(arm, Treatment('direct')) + C(axis, Treatment('relabel')) + C(model) + C(task)", data=L,
+                  family=sm.families.Binomial()).fit(cov_type="cluster", cov_kwds={"groups": pd.factorize(L.cluster)[0]})
+    ci = fit.conf_int()
+    out["logit_flip"][ds] = {k: [round(float(np.exp(fit.params[k])), 2), round(float(np.exp(ci.loc[k, 0])), 2),
+                                 round(float(np.exp(ci.loc[k, 1])), 2)] for k in fit.params.index if "arm" in k or "axis" in k}
+    out["logit_flip_n"][ds] = dict(tuples=int(len(L)), clusters=int(L.cluster.nunique()))
 
 # ---------------------------------------------------------------- charts: how flips split (D) and how far apart (S)
 prof = {}
@@ -334,19 +317,20 @@ P["bin"] = pd.cut(P.m, bins=[-1, 10, 20, 40, 10**6], labels=["up to 10", "11 to 
 G_ = P.groupby(["dataset", "bin", "arm"], observed=True).flip.agg(["sum", "size"]).reset_index()
 out["flip_rate_by_edges_relabel+order"] = {f"{r.dataset}|{r.bin}|{r.arm}": dict(flips=int(r["sum"]), tuples=int(r["size"]),
                                             flip_rate=round(100 * r["sum"] / r["size"], 1)) for _, r in G_.iterrows()}
-P["log2m"] = np.log2(P.m + 1)
+P["log2m"] = np.log2(P.m + 1)  # log2(edges + 1): one unit = a doubling of (edges + 1)
 P["y"] = P.flip.astype(int)
 P["arm"] = pd.Categorical(P.arm, ARMS_M12)
-P["task_ds"] = P.dataset + ":" + P.task
-fit = smf.glm("y ~ C(arm) * log2m + C(task_ds) + C(model)", data=P, family=sm.families.Binomial()).fit(
-    cov_type="cluster", cov_kwds={"groups": pd.factorize(P.cluster)[0]})
 size_or = {}
-for arm, terms in [("direct", ["log2m"]), ("code/native", ["log2m", "C(arm)[T.code/native]:log2m"]),
-                   ("code/networkx", ["log2m", "C(arm)[T.code/networkx]:log2m"])]:
-    v = pd.Series(0.0, index=fit.params.index)
-    v[terms] = 1.0
-    est, se = float(v @ fit.params), float(np.sqrt(v @ fit.cov_params() @ v))
-    size_or[arm] = [round(math.exp(est), 2), round(math.exp(est - 1.96 * se), 2), round(math.exp(est + 1.96 * se), 2)]
+for ds, g in P.groupby("dataset", sort=False):  # one model per dataset
+    fit = smf.glm("y ~ C(arm) * log2m + C(task) + C(model)", data=g, family=sm.families.Binomial()).fit(
+        cov_type="cluster", cov_kwds={"groups": pd.factorize(g.cluster)[0]})
+    size_or[ds] = {}
+    for arm, terms in [("direct", ["log2m"]), ("code/native", ["log2m", "C(arm)[T.code/native]:log2m"]),
+                       ("code/networkx", ["log2m", "C(arm)[T.code/networkx]:log2m"])]:
+        v = pd.Series(0.0, index=fit.params.index)
+        v[terms] = 1.0
+        est, se = float(v @ fit.params), float(np.sqrt(v @ fit.cov_params() @ v))
+        size_or[ds][arm] = [round(math.exp(est), 2), round(math.exp(est - 1.96 * se), 2), round(math.exp(est + 1.96 * se), 2)]
 out["flip_odds_ratio_per_doubling_of_edges"] = size_or
 wt = []
 for (ds, task), g in P.groupby(["dataset", "task"]):
@@ -361,32 +345,30 @@ out["within_task_rise_largest_vs_smallest_third"] = {a: dict(tasks=int((W.arm ==
                                                             median_points=round(float(W[W.arm == a].rise.median()), 1))
                                                      for a in ["direct", "code/native"]}
 
-# ---------------------------------------------------------------- other reading (Figure 2b)
+# ---------------------------------------------------------------- other reading (Figure 6)
+# Flipped M2 tuples (relabel and order, both libraries) of the node-list questions: does some answer in the
+# tuple equal the other reading's answer? GraphQA's "connected to" questions (undirected graphs) read as either
+# adjacency or reachability; Erdős `neighbor` means the successors on a directed graph and the neighbours on an
+# undirected one. Tags use the answers that exist; `with_crash` counts the flips in which some serialization
+# gave no answer (they are tagged on the rest).
 alt = {}
 for iid, r in inst.items():
-    if r["task"] in ("connected_nodes", "disconnected_nodes", "neighbor") and r["query_args"].get("node") is not None:
-        Gx = nx.Graph()
+    if r["task"] in READING_TASKS and r["query_args"].get("node") is not None:
+        Gx = nx.DiGraph() if r["directed"] else nx.Graph()
         Gx.add_nodes_from(r["nodes"])
         Gx.add_edges_from(tuple(e[:2]) for e in r["edges"])
         q = r["query_args"]["node"]
-        N, R, V = set(Gx.neighbors(q)), nx.node_connected_component(Gx, q) - {q}, set(Gx.nodes)
-        alt[iid] = {"connected_nodes": (N, R), "disconnected_nodes": (V - N - {q}, V - R - {q}), "neighbor": (N, None)}[r["task"]]
-code = j[(j["mode"] == "code") & j.axis.isin(PERM) & j.task.isin(["connected_nodes", "disconnected_nodes", "neighbor"])]
-tags = []
-for (m, iid, lib, ax), g in code.groupby(["model", "instance_id", "library", "axis"]):
-    ok = g.answer_key.notna() & ~g.failure_class.isin(["execution", "format"])
-    if not ok.all() or g.answer_key.nunique() < 2 or g.correct.all() or iid not in alt:
-        continue
-    base, other = alt[iid]
-    answers = [set(json.loads(k)) for k in g.answer_key]
-    if g.task.iat[0] == "neighbor":
-        tag = "strict subset of true neighbours" if any(s < base for s in answers) else "other"
-    else:
-        tag = "readings coincide" if other == base else ("takes the other reading" if any(s == other for s in answers) else "other")
-    tags.append(dict(dataset=g.dataset.iat[0], task=g.task.iat[0], model=m, tag=tag))
-TG = pd.DataFrame(tags)
-out["other_reading_code_flips"] = {f"{d}|{t}|{m}": {k: int(v) for k, v in c.items()}
-                                   for (d, t, m), c in TG.groupby(["dataset", "task", "model"]).tag.value_counts().unstack(fill_value=0).iterrows()}
+        N, V = set(Gx.successors(q) if r["directed"] else Gx.neighbors(q)), set(Gx.nodes)
+        R = None if r["directed"] else nx.node_connected_component(Gx, q) - {q}
+        alt[iid] = {"connected_nodes": (N, R), "disconnected_nodes": (V - N - {q}, V - R - {q}) if R is not None else None,
+                    "neighbor": (N, None)}[r["task"]]
+TG = pd.DataFrame([dict(t, tag=reading_tag(t["task"], [set(a) for a in t["answers"] if isinstance(a, list)],
+                                             *alt[t["instance_id"]])) for t in reading])
+reading_out = {}
+for (d, t, m), g in TG.groupby(["dataset", "task", "model"]):
+    reading_out[f"{d}|{t}|{m}"] = dict(flips=int(len(g)), with_crash=int(g.with_crash.sum()),
+                                       **{k: int(v) for k, v in g.tag.value_counts().items()})
+out["other_reading_code_flips"] = reading_out
 
 # ---------------------------------------------------------------- bootstrap CIs for the figures (relabel+order)
 # Figures 2-3 pool M2 over its two libraries and the models; Figures B1-B2 keep the models apart. Same
