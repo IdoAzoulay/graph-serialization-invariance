@@ -11,8 +11,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PYTHON:-.venv/bin/python}
+[ -x "$PY" ] || PY=.venv/Scripts/python   # Windows venv layout
 [ -x "$PY" ] || PY=python
-export DEEPSEEK_API_KEY= OPENROUTER_API_KEY= HF_TOKEN= MPLBACKEND=Agg
+# No key reaches any client, and the dataset is downloaded anonymously (not with a stored login).
+export DEEPSEEK_API_KEY= OPENROUTER_API_KEY= HF_TOKEN= HF_HUB_DISABLE_IMPLICIT_TOKEN=1 MPLBACKEND=Agg
 MODELS=(hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b hf-deepseek-v4-flash)
 step() { echo "=== $(date '+%T') $*"; }
 

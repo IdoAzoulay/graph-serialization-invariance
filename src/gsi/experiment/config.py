@@ -59,10 +59,17 @@ class ExperimentConfig:
                 if lib is None or lib not in self.library_tasks or task in self.library_tasks[lib]]
 
 
+CONFIG_KEYS = {"name", "root", "datasets", "variants", "modes", "models", "libraries", "library_tasks", "exec",
+               "paths", "inject_graph_type"}
+
+
 def load_config(path: str | Path) -> ExperimentConfig:
     path = Path(path).resolve()
     with path.open() as f:
         raw = yaml.safe_load(f)
+    unknown = sorted(set(raw) - CONFIG_KEYS)
+    if unknown:  # a misspelt key would otherwise leave its setting at the default without a word
+        raise ValueError(f"{path}: unknown config key(s) {unknown}; known keys are {sorted(CONFIG_KEYS)}")
     root = Path(raw.get("root", path.parent.parent)).resolve()
     return ExperimentConfig(
         name=raw["name"], root=root, datasets=raw["datasets"], variants=raw.get("variants", {}),

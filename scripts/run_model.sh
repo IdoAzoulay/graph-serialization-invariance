@@ -1,9 +1,10 @@
 #!/bin/bash
-# Full experiment for one model: both datasets, all stages, analysis. Resumable at every stage,
-# so re-running after any failure continues where it stopped. Keeps the machine awake.
+# Full experiment for one model: both datasets and the Erdős M3 rerun that states the graph type, all
+# stages, analysis. Calls the model API. Resumable at every stage, so re-running after any failure
+# continues where it stopped. Keeps the machine awake.
 #
-#   nohup scripts/run_model.sh hf-qwen3-8b > results/hf-qwen3-8b.log 2>&1 &
-#   tail -f results/hf-qwen3-8b.log
+#   nohup scripts/run_model.sh hf-qwen3-8b-nscale > results/hf-qwen3-8b-nscale.log 2>&1 &
+#   tail -f results/hf-qwen3-8b-nscale.log
 set -u
 MODEL="${1:?usage: run_model.sh <model-name-from-configs/models.yaml>}"
 cd "$(dirname "$0")/.." || exit 1
@@ -21,7 +22,7 @@ cmd[0] = shutil.which(cmd[0]) or cmd[0]   # CreateProcess does not add .exe to a
 sys.exit(subprocess.call(cmd))' "$@"
 }
 echo "=== $(date '+%F %T') START model=$MODEL host=$(hostname) ==="
-for cfg in graphqa erdos; do
+for cfg in graphqa erdos erdos_m3fix; do
   echo "=== $(date '+%F %T') $cfg: llm ==="
   caffeinate -i $PY scripts/run.py --config configs/$cfg.yaml --models "$MODEL" --stages data,variants,llm || { echo "=== llm stage failed for $cfg; stopping ==="; exit 2; }
   echo "=== $(date '+%F %T') $cfg: exec,score ==="

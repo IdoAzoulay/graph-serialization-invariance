@@ -15,9 +15,10 @@ results/*/*
 !results/*/tables/
 !results/*/figs/
 # Keep the audit and paper-metric outputs alongside the published analysis.
-!results/review/*.py
 !results/review/*.json
 !results/review/*.csv
+# Outputs of the offline smoke check (configs/smoke.yaml)
+results/smoke/
 
 # LaTeX intermediate files
 *.aux

@@ -18,6 +18,6 @@ datasets:
 modes: [direct, code, graph_as_code]
 libraries: [networkx, native]
 # Optional: restrict an arm to a subset of tasks, e.g.
-# library_tasks: {native: [degree, edge_number, node_number, neighbor]}
-models: [deepseek-chat, qwen-7b]
+# library_tasks: {native: [degree, edge_number, neighbor]}
+models: [hf-qwen3-8b-nscale, hf-deepseek-v3.1-novita, hf-gemma-4-31b, hf-deepseek-v4-flash]
 exec: {timeout: 20, mem_mb: 1024, workers: 4}

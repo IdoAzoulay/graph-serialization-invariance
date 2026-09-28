@@ -1,18 +1,25 @@
-"""Stages: data -> variants -> llm -> exec -> score. Every stage is idempotent:
-LLM responses are cached by prompt hash, executions by code hash, and each
-JSONL sink skips record_ids it already holds."""
+"""Stages: data -> variants -> llm -> exec -> score. Every stage can be re-run and resumes where it stopped:
+LLM responses are cached by prompt hash, executions by code hash, and each JSONL sink skips the record_ids it
+already holds. A stored response whose prompt has changed since is dropped and asked again.
+
+The data stage writes data/processed/<config>/instances.jsonl only when it does not exist: the committed
+instances pin the sampled graphs (GraphQA's SBM generator draws different graphs under networkx 3.7, and the
+Erdős download is not versioned). --rebuild-data regenerates them on purpose."""
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import sys
 import threading
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from gsi.data.base import GraphInstance, append_jsonl, read_jsonl, write_jsonl
+from gsi.data.base import GraphInstance, append_jsonl, read_jsonl, trim_partial_line, write_jsonl
 from gsi.exec import sandbox
+from gsi.exec.sandbox import atomic_write_text
 from gsi.experiment.config import ExperimentConfig, load_config, load_models
 from gsi.llm.client import LLMClient, ModelSpec
 from gsi.llm.stub import StubLLM
@@ -24,7 +31,9 @@ from gsi.serial.render import render
 from gsi.serial.variant import Variant, canonical, make_variants
 
 STAGES = ("data", "variants", "llm", "exec", "score")
-ERROR_ABORT_MIN, ERROR_ABORT_FRACTION = 25, 0.5      # abort the llm stage past this error rate
+# Abort the llm stage once at least ERROR_ABORT_MIN calls have failed and at least ERROR_ABORT_FRACTION of the
+# last ERROR_WINDOW completions failed.
+ERROR_ABORT_MIN, ERROR_ABORT_FRACTION, ERROR_WINDOW = 25, 0.5, 50
 
 
 def log(msg: str) -> None:
@@ -40,7 +49,12 @@ def load_dotenv(root: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+        v = v.strip()
+        if v[:1] in ("'", '"'):
+            v = v[1:v.index(v[0], 1)] if v[0] in v[1:] else v[1:]
+        else:
+            v = re.split(r"(?:^|\s+)#", v, maxsplit=1)[0].strip()  # an unquoted value ends at a comment
+        os.environ.setdefault(k.strip(), v)
 
 
 def arm_label(mode: str, library: str | None) -> str:
@@ -95,6 +109,18 @@ def build_instances(cfg: ExperimentConfig) -> list[GraphInstance]:
     return out
 
 
+def instances_for(cfg: ExperimentConfig, rebuild: bool) -> list[GraphInstance]:
+    """The data stage: the committed instances when they exist, built (and written) otherwise."""
+    path = cfg.data_dir / "instances.jsonl"
+    if path.exists() and not rebuild:
+        instances = load_instances(cfg)
+        log(f"[data] {len(instances)} instances from {path} (kept; --rebuild-data regenerates them)")
+        return instances
+    instances = build_instances(cfg)
+    log(f"[data] {len(instances)} instances built and written to {path}")
+    return instances
+
+
 def build_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
     out: dict[str, list[Variant]] = {}
     rows = []
@@ -127,6 +153,7 @@ class Sink:
     def __init__(self, path: Path):
         self.path = path
         self.lock = threading.Lock()
+        trim_partial_line(path)
         self.ids = {r["record_id"] for r in read_jsonl(path)}
 
     def has(self, record_id: str) -> bool:
@@ -146,25 +173,53 @@ def make_client(spec: ModelSpec, cache_dir: Path):
 
 # ---------------- llm stage ----------------
 
-def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit: int | None = None) -> None:
+def drop_records(path: Path, record_ids: set[str]) -> int:
+    """Remove the rows with these record_ids from a JSONL sink; returns how many were removed."""
+    if not path.exists() or not record_ids:
+        return 0
+    rows = list(read_jsonl(path))
+    kept = [r for r in rows if r["record_id"] not in record_ids]
+    atomic_write_text(path, "".join(json.dumps(r) + "\n" for r in kept))
+    return len(rows) - len(kept)
+
+
+def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit: int | None = None) -> int:
+    """Ask every prompt not answered yet; returns the number of failed calls."""
     client = make_client(spec, cfg.cache_dir)
-    sink = Sink(cfg.results_dir / "responses" / f"{spec.name}.jsonl")
-    jobs = []
+    out = cfg.results_dir / "responses" / f"{spec.name}.jsonl"
+    stored = {r["record_id"]: r.get("prompt_hash") for r in read_jsonl(out)}
+    todo, stale = [], set()
     for inst in instances:
         for v in variants[inst.id]:
             for mode, library in iter_arms(cfg, inst):
                 p = build_prompt(mode, inst, v, library, inject_graph_type=cfg.inject_graph_type)
                 rid = f"{p.prompt_id}::{spec.name}"
-                if not sink.has(rid):
-                    jobs.append((rid, p, inst, v))
+                if rid in stored and stored[rid] != p.prompt_hash:
+                    stale.add(rid)
+                todo.append((rid, p, inst, v))
+    if stale:
+        # The record_id names the instance, form, arm and model, not the prompt text, so a prompt that
+        # changed since (new instances, a template edit) must not be answered by the old reply.
+        n = drop_records(out, stale)
+        n_exec = drop_records(cfg.results_dir / "exec" / f"{spec.name}.jsonl", stale)
+        log(f"[llm:{spec.name}] {n} stored responses (and {n_exec} executions) answer an older prompt; asking again")
+    sink = Sink(out)
+    jobs = [j for j in todo if not sink.has(j[0])]
     if limit:
         jobs = jobs[:limit]
     log(f"[llm:{spec.name}] {len(jobs)} prompts to run ({len(sink.ids)} already done)")
     errors = 0
+    failed: set[str] = set()   # prompt hashes that already failed in this run: not sent again
 
     def work(job):
         rid, p, inst, v = job
-        r = client.complete(p, context={"inst": inst, "variant": v})
+        if p.prompt_hash in failed:
+            raise RuntimeError(f"prompt {p.prompt_hash[:12]} already failed in this run")
+        try:
+            r = client.complete(p, context={"inst": inst, "variant": v})
+        except Exception:
+            failed.add(p.prompt_hash)
+            raise
         row = {"record_id": rid, "instance_id": inst.id, "variant_id": v.variant_id, "mode": p.mode,
                "library": p.library, **r.to_dict()}
         sink.write(row)
@@ -173,11 +228,14 @@ def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit
     with ThreadPoolExecutor(max_workers=max(1, spec.max_concurrency)) as pool:
         futs = {pool.submit(work, j): j for j in jobs}
         done = cached = 0
+        recent: deque[bool] = deque(maxlen=ERROR_WINDOW)
         for fut in as_completed(futs):
             try:
                 cached += bool(fut.result())
+                recent.append(False)
             except Exception as e:
                 errors += 1
+                recent.append(True)
                 log(f"[llm:{spec.name}] error on {futs[fut][0]}: {e!r}")
             done += 1
             if done % 50 == 0 or done == len(jobs):
@@ -185,10 +243,13 @@ def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit
             # A sustained error rate means something systemic -- exhausted credits (402), a dead
             # endpoint, a bad key -- and spinning through the remaining jobs only fills the log.
             # Stop; the sink has everything that succeeded and a re-run resumes from there.
-            if errors >= ERROR_ABORT_MIN and errors >= ERROR_ABORT_FRACTION * done:
+            if errors >= ERROR_ABORT_MIN and sum(recent) >= ERROR_ABORT_FRACTION * len(recent):
+                cancelled = sum(f.cancel() for f in futs)
                 pool.shutdown(wait=False, cancel_futures=True)
-                raise RuntimeError(f"[llm:{spec.name}] aborting: {errors} errors in {done} completions "
-                                   f"({len(jobs) - done} jobs cancelled); fix the cause and re-run to resume")
+                raise RuntimeError(f"[llm:{spec.name}] aborting: {sum(recent)} of the last {len(recent)} calls "
+                                   f"failed ({errors} in all, {cancelled} jobs cancelled); fix the cause and "
+                                   f"re-run to resume")
+    return errors
 
 
 # ---------------- exec stage ----------------
@@ -262,8 +323,14 @@ def stage_score(cfg: ExperimentConfig, spec: ModelSpec, instances, variants) -> 
     inst_by_id = {i.id: i for i in instances}
     var_by_id = {v.variant_id: v for vs in variants.values() for v in vs}
     execs = {r["record_id"]: r for r in read_jsonl(cfg.results_dir / "exec" / f"{spec.name}.jsonl")}
+    # one row per record: the last one written, if two processes ever appended the same record
+    responses = {r["record_id"]: r for r in read_jsonl(cfg.results_dir / "responses" / f"{spec.name}.jsonl")}
+    if not responses:
+        # scored/<model>.jsonl may have been restored from the published dataset without its responses
+        raise SystemExit(f"[score:{spec.name}] no responses in {cfg.results_dir / 'responses'}; "
+                         f"not overwriting {cfg.results_dir / 'scored' / (spec.name + '.jsonl')}")
     rows = []
-    for resp in read_jsonl(cfg.results_dir / "responses" / f"{spec.name}.jsonl"):
+    for resp in responses.values():
         inst, v = inst_by_id.get(resp["instance_id"]), var_by_id.get(resp["variant_id"])
         if inst is None or v is None:
             continue
@@ -284,18 +351,27 @@ def main(argv=None) -> None:
     ap.add_argument("--models", nargs="*", help="override the model list from the config")
     ap.add_argument("--stages", default=",".join(STAGES))
     ap.add_argument("--limit", type=int, help="max new prompts per model (debugging)")
-    ap.add_argument("--estimate", action="store_true", help="build data/variants, print prompt counts, and exit")
+    ap.add_argument("--estimate", action="store_true", help="build variants, print prompt counts, and exit")
+    ap.add_argument("--rebuild-data", action="store_true",
+                    help="regenerate instances.jsonl even though it exists (changes the committed data)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
     load_dotenv(cfg.root)
     stages = [s.strip() for s in args.stages.split(",")]
+    unknown = [s for s in stages if s not in STAGES]
+    if unknown:
+        ap.error(f"unknown stage(s) {unknown}; stages are {','.join(STAGES)}")
+    if args.models is not None and not args.models:
+        ap.error("--models needs at least one model name")
     specs = load_models(cfg.models_file)
     model_names = args.models or cfg.models
+    missing = [m for m in model_names if m not in specs]
+    if missing:
+        ap.error(f"model(s) {missing} not in {cfg.models_file}")
 
-    if "data" in stages or args.estimate:
-        instances = build_instances(cfg)
-        log(f"[data] {len(instances)} instances")
+    if "data" in stages or args.estimate or not (cfg.data_dir / "instances.jsonl").exists():
+        instances = instances_for(cfg, args.rebuild_data)
     else:
         instances = load_instances(cfg)
     if "variants" in stages or args.estimate:
@@ -308,14 +384,18 @@ def main(argv=None) -> None:
         estimate(cfg, instances, variants, model_names)
         return
 
+    errors = 0
     for name in model_names:
         spec = specs[name]
         if "llm" in stages:
-            stage_llm(cfg, spec, instances, variants, limit=args.limit)
+            errors += stage_llm(cfg, spec, instances, variants, limit=args.limit)
         if "exec" in stages:
             stage_exec(cfg, spec, variants)
         if "score" in stages:
             stage_score(cfg, spec, instances, variants)
+    if errors:
+        # the records that failed are missing; a re-run asks only them
+        raise SystemExit(f"{errors} model calls failed; re-run the same command to retry them")
 
 
 if __name__ == "__main__":

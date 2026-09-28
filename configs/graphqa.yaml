@@ -4,7 +4,7 @@ datasets:
     n_graphs: 100
     seed: 0
     generators: [er, ba, sfn, sbm, star, path, complete]   # Fatemi A.4, sampled 500:500:500:500:100:100:100
-    # Fatemi A.2's seven tasks; shortest_path / triangle_counting / reachability exist but belong to Erdos
+    # Fatemi A.2's seven tasks
     tasks: [edge_existence, node_degree, node_count, edge_count, connected_nodes, disconnected_nodes, cycle_check]
     # canonical = GraphQA "adjacency" encoder: edge list in words, integer labels, sorted (u, v)
     variants:
@@ -18,6 +18,6 @@ datasets:
 modes: [direct, code, graph_as_code]
 libraries: [networkx, native]
 # Optional: restrict an arm to a subset of tasks, e.g.
-# library_tasks: {native: [degree, edge_number, node_number, neighbor]}
-models: [deepseek-chat, qwen-7b]
+# library_tasks: {native: [node_degree, edge_count, node_count, cycle_check]}
+models: [hf-qwen3-8b-nscale, hf-deepseek-v3.1-novita, hf-gemma-4-31b, hf-deepseek-v4-flash]
 exec: {timeout: 20, mem_mb: 1024, workers: 4}

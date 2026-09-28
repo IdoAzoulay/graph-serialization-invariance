@@ -115,11 +115,15 @@ def row_to_instance(row: dict, idx: int) -> GraphInstance | None:
     )
 
 
+# The dataset revision the committed instances were sampled from (rebuilding from it is byte-identical).
+ERDOS_REVISION = "786f85015eec845e821ec45533087e8c7955c025"
+
+
 def build_erdos(tasks=DEFAULT_TASKS, n_per_task: int = 100, seed: int = 0, split: str = "test",
                 max_prompt_chars: int | None = None) -> list[GraphInstance]:
     from datasets import load_dataset
 
-    ds = load_dataset("PKU-ML/Erdos")[split]
+    ds = load_dataset("PKU-ML/Erdos", revision=ERDOS_REVISION)[split]
     rng = random.Random(seed)
     out: list[GraphInstance] = []
     for task in tasks:
