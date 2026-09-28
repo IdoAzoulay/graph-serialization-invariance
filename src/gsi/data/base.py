@@ -8,8 +8,6 @@ from typing import Any, Iterable, Iterator
 
 import networkx as nx
 
-ANSWER_TYPES = ("bool", "int", "float", "node", "node_set", "path", "edge_set")
-
 
 @dataclass
 class GraphInstance:

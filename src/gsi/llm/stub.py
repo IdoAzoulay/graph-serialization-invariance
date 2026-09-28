@@ -69,9 +69,11 @@ def wrong_answer(value: Any, answer_type: str, nodes: list[int]) -> Any:
 
 
 class StubLLM:
-    def __init__(self, spec: ModelSpec, cache_dir=None):
+    def __init__(self, spec: ModelSpec):
         self.spec = spec
         self.behaviour = spec.stub.get("behaviour", "mix")
+        if self.behaviour != "mix" and self.behaviour not in BEHAVIOURS:
+            raise ValueError(f"unknown stub behaviour {self.behaviour!r}; use 'mix' or one of {BEHAVIOURS}")
 
     def _pick(self, prompt: Prompt) -> str:
         if self.behaviour != "mix":

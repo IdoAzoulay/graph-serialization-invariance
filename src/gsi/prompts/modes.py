@@ -21,7 +21,7 @@ those two lines.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 from gsi.data.base import GraphInstance
 from gsi.serial.variant import Variant
@@ -82,9 +82,6 @@ TASK_SENTENCE = {
     "connected_nodes": "list all the nodes connected to a given node",
     "disconnected_nodes": "list all the nodes that are not connected to a given node",
     "cycle_check": "determine whether the graph contains a cycle",
-    "reachability": "determine whether a path exists between two given nodes",
-    "shortest_path": "calculate the length of the shortest path between two given nodes",
-    "triangle_counting": "count the number of triangles",
 }
 
 
@@ -104,9 +101,6 @@ class Prompt:
     # cache entry and the record id instead. repeat>0 exists only to measure the nondeterminism
     # floor -- how often the answer changes with no perturbation at all.
     repeat: int = 0
-
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 
 def is_code(mode: str) -> bool:

@@ -32,7 +32,7 @@ from gsi.prompts.modes import INJECT_MODES
 from gsi.serial.variant import Variant, norm_label, normalize_edges, true_edge_set
 
 RUNNER = Path(__file__).with_name("runner.py")
-CACHE_VERSION = 6
+CACHE_VERSION = 7
 GRAPH_VARS = ("nodes", "edges")
 
 
@@ -151,9 +151,12 @@ def _declared_checks(side: dict, v: Variant) -> tuple[bool | None, frozenset[str
     return ok, norm
 
 
-def _cache_key(code: str, v: Variant, mode: str) -> str:
+def _cache_key(code: str, v: Variant, mode: str, timeout: float, mem_mb: int) -> str:
+    # the limits and the networkx version are part of the measurement, so they are part of the key
+    import networkx
     payload = json.dumps({"v": CACHE_VERSION, "inject": mode in INJECT_MODES, "code": code, "node_seq": v.node_seq,
-                          "edge_seq": v.edge_seq, "directed": v.directed, "weighted": v.weighted}, sort_keys=True)
+                          "edge_seq": v.edge_seq, "directed": v.directed, "weighted": v.weighted,
+                          "timeout": timeout, "mem_mb": mem_mb, "networkx": networkx.__version__}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -212,7 +215,7 @@ def _match_graphs(raw_graphs: list[dict], v: Variant) -> tuple[list[dict], int |
 
 def run(code: str, v: Variant, mode: str, *, timeout: float = 20, mem_mb: int = 1024,
         cache_dir: str | Path | None = None) -> ExecutionResult:
-    key = _cache_key(code, v, mode)
+    key = _cache_key(code, v, mode, timeout, mem_mb)
     cache_path = Path(cache_dir) / f"{key}.json" if cache_dir else None
     # identical executions (same code, same data) are serialized so only one of them runs
     with _key_lock(key) if cache_path else nullcontext():
@@ -221,7 +224,12 @@ def run(code: str, v: Variant, mode: str, *, timeout: float = 20, mem_mb: int = 
             if cached is not None:
                 return cached
         result = _execute(code, v, mode, timeout, mem_mb)
-        if cache_path:
+        if result.timed_out:
+            # The limit is wall-clock time, so a busy machine can time out a program that finishes in a
+            # fraction of a second (every timeout of the published run did). Try once more, and never
+            # cache a timeout: a later run gets its own chance.
+            result = _execute(code, v, mode, timeout, mem_mb)
+        if cache_path and not result.timed_out:
             atomic_write_text(cache_path, json.dumps(result.to_dict()))
         return result
 
@@ -240,8 +248,8 @@ def _execute(code: str, v: Variant, mode: str, timeout: float, mem_mb: int) -> E
                "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
         t0 = time.time()
         timed_out = False
-        proc = subprocess.Popen([sys.executable, "-I", str(RUNNER), tmp, mode], cwd=tmp, env=env,
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+        proc = subprocess.Popen([sys.executable, "-I", str(RUNNER), tmp], cwd=tmp, env=env,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
                                 start_new_session=True)
         try:
             _, stderr = proc.communicate(timeout=timeout)

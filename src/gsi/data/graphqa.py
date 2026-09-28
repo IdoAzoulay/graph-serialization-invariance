@@ -1,10 +1,15 @@
 """GraphQA-style graphs and tasks (Fatemi et al., ICLR 2024), regenerated locally.
 
-The generator follows Fatemi Appendix A.4 exactly: seven families, 5-20 nodes,
-ER edge probability drawn from [0, 1], SBM communities drawn from 2 to 10, and the
-500/500/500/500/100/100/100 sampling proportions (the last three families "have less
-variety"). Ground truth is computed with networkx, as they did. Node labels are
-0..n-1; canonical edge order is sorted (u < v).
+The generator follows Fatemi Appendix A.4: seven families, 5-20 nodes, ER edge probability
+drawn from [0, 1], SBM communities drawn from 2 to 10, and the 500/500/500/500/100/100/100
+sampling proportions (the last three families "have less variety"). A.4 leaves the rest open;
+our choices are 1-4 attachment edges for BA and equal-sized SBM blocks with edge probability
+0.7 inside a block and 0.1 between blocks. Ground truth is computed with networkx, as they did.
+Node labels are 0..n-1; canonical edge order is sorted (u < v).
+
+networkx 3.7 changed `stochastic_block_model`, so the SBM graphs of data/processed/graphqa were
+drawn with networkx 3.6 and are not reproduced by later versions; the committed instances are
+the data.
 """
 from __future__ import annotations
 
@@ -19,10 +24,7 @@ NODE_RANGE = (5, 20)
 # Fatemi A.4: 500 graphs each for ER/BA/SFN/SBM, 100 each for path/complete/star
 GENERATOR_WEIGHTS = {"er": 500, "ba": 500, "sfn": 500, "sbm": 500, "star": 100, "path": 100, "complete": 100}
 
-# Fatemi A.2 defines the first seven; the rest are extras used by the Erdos-style configs.
-FATEMI_TASKS = ("edge_existence", "node_degree", "node_count", "edge_count",
-                "connected_nodes", "disconnected_nodes", "cycle_check")
-
+# Fatemi A.2's seven tasks and their answer types
 TASKS: dict[str, str] = {
     "edge_existence": "bool",
     "node_degree": "int",
@@ -31,9 +33,6 @@ TASKS: dict[str, str] = {
     "connected_nodes": "node_set",
     "disconnected_nodes": "node_set",
     "cycle_check": "bool",
-    "reachability": "bool",
-    "shortest_path": "int",
-    "triangle_counting": "int",
 }
 
 QUESTIONS: dict[str, str] = {
@@ -44,9 +43,6 @@ QUESTIONS: dict[str, str] = {
     "connected_nodes": "List all the nodes connected to node {node} in ascending order.",
     "disconnected_nodes": "List all the nodes that are not connected to node {node} (excluding node {node} itself).",
     "cycle_check": "Is there a cycle in this graph?",
-    "reachability": "Is there a path from node {u} to node {v}?",
-    "shortest_path": "What is the length, in number of edges, of the shortest path from node {u} to node {v}?",
-    "triangle_counting": "How many triangles (sets of three mutually connected nodes) are in the graph?",
 }
 
 
@@ -89,15 +85,6 @@ def sample_query(task: str, G: nx.Graph, rng: random.Random) -> dict | None:
         pool = edges if (rng.random() < 0.5 and edges) or not non_edges else non_edges
         u, v = rng.choice(pool)
         return {"u": u, "v": v} if rng.random() < 0.5 else {"u": v, "v": u}
-    if task == "reachability":
-        u, v = rng.sample(nodes, 2)
-        return {"u": u, "v": v}
-    if task == "shortest_path":
-        pairs = [(u, v) for u in nodes for v in nodes if u != v and nx.has_path(G, u, v)]
-        if not pairs:
-            return None
-        u, v = rng.choice(pairs)
-        return {"u": u, "v": v}
     return {}
 
 
@@ -117,12 +104,6 @@ def ground_truth(task: str, G: nx.Graph, q: dict):
         return sorted(n for n in G.nodes if n not in nbrs)
     if task == "cycle_check":
         return not nx.is_forest(G)
-    if task == "reachability":
-        return nx.has_path(G, q["u"], q["v"])
-    if task == "shortest_path":
-        return nx.shortest_path_length(G, q["u"], q["v"])
-    if task == "triangle_counting":
-        return sum(nx.triangles(G).values()) // 3
     raise ValueError(f"unknown task {task}")
 
 

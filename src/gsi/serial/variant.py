@@ -12,12 +12,8 @@ import random
 from dataclasses import asdict, dataclass
 from typing import Any
 
-import networkx as nx
-
 from gsi.data.base import GraphInstance
 
-AXES = ("canonical", "relabel", "order", "structure", "syntax")
-STRUCTURES = ("edge_list", "adj_list")
 SYNTAXES = ("plain", "json", "networkx_code", "graphqa_nl", "erdos_nl")
 EDGE_LIST_ORDERINGS = ("sorted_st", "s_sorted_t_shuffled", "t_sorted_s_shuffled", "shuffle_all")
 ADJ_LIST_ORDERINGS = ("lines_shuffled", "neighbors_shuffled", "shuffle_all")
@@ -197,16 +193,6 @@ def same_serialization(v: Variant, ref: Variant) -> bool:
             and v.params["structure"] == ref.params["structure"]
             and v.params["replicated"] == ref.params["replicated"]
             and v.params["syntax"] == ref.params["syntax"])
-
-
-def to_nx(v: Variant) -> nx.Graph:
-    G = nx.DiGraph() if v.directed else nx.Graph()
-    G.add_nodes_from(v.node_seq)
-    if v.weighted:
-        G.add_weighted_edges_from((e[0], e[1], e[2]) for e in v.edge_seq)
-    else:
-        G.add_edges_from((e[0], e[1]) for e in v.edge_seq)
-    return G
 
 
 def norm_label(x: Any) -> str:

@@ -1,6 +1,6 @@
 """Runs inside the sandbox subprocess. Standalone on purpose: no gsi imports.
 
-usage: python -I runner.py <workdir> <mode>
+usage: python -I runner.py <workdir>
 Reads <workdir>/code.py and <workdir>/variant.json, writes <workdir>/sidecar.json.
 
 The answer is the variable `ans` left in the program's namespace (CodeGraph's
@@ -91,7 +91,7 @@ def _declared_edges(value):
 
 
 def main():
-    workdir, mode = sys.argv[1], sys.argv[2]
+    workdir = sys.argv[1]
     with open(os.path.join(workdir, "variant.json")) as f:
         cfg = json.load(f)
     _limits(cfg)

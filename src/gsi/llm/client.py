@@ -47,7 +47,6 @@ class LLMResponse:
     code: str | None
     usage: dict
     latency_s: float
-    error: str | None = None
     cached: bool = False
 
     def to_dict(self) -> dict:
@@ -97,6 +96,11 @@ class LLMClient:
             d = json.loads(p.read_text())
         except (OSError, ValueError):
             return None
+        if d.get("model") not in (None, self.spec.model):
+            # the cache folder is named after the config entry, so an entry whose model id changed would
+            # otherwise be answered by the old model's replies
+            raise RuntimeError(f"{p} holds a reply from {d['model']}, but {self.spec.name} is now {self.spec.model}; "
+                               f"move {self.cache_dir} aside or restore the old model id")
         return LLMResponse(prompt_id=prompt.prompt_id, model=self.spec.name, prompt_hash=prompt.prompt_hash,
                            raw_text=d["raw_text"], code=extract_code(d["raw_text"]), usage=d.get("usage", {}),
                            latency_s=d.get("latency_s", 0.0), cached=True)

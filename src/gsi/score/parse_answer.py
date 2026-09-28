@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-_ANSWER_RE = re.compile(r"^[\s*`_#>]*ANSWER\s*[:：]\s*(.*?)\s*$", re.IGNORECASE | re.MULTILINE)
 _NUM_RE = re.compile(r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
 _INT_RE = re.compile(r"[+-]?\d+")
 _PAIR_RE = re.compile(r"\(\s*([+-]?\d+)\s*,\s*([+-]?\d+)\s*\)")
@@ -45,16 +44,6 @@ def find_boxed_answer(text: str | None) -> str | None:
         return _clean(boxed)
     m = _G1_FALLBACK.findall(text)
     return _clean(m[-1]) if m else None
-
-
-def find_answer_line(text: str | None) -> str | None:
-    if not text:
-        return None
-    matches = _ANSWER_RE.findall(text)
-    if matches:
-        return _clean(matches[-1])
-    lines = [l for l in text.splitlines() if l.strip()]
-    return _clean(lines[-1]) if lines else None
 
 
 def _bracket_body(s: str) -> str | None:

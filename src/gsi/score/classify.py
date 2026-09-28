@@ -21,12 +21,6 @@ from __future__ import annotations
 
 from gsi.prompts.modes import is_inject
 
-FAILURE_CLASSES = ("ok", "wrong", "execution", "format", "transcription", "construction",
-                   "logic", "no_computation", "unverifiable")
-
-# The classes that localize a code-mode failure along the chain above.
-LOCALIZED = ("transcription", "construction", "logic")
-
 
 def classify(mode: str, correct: bool, parsed, exec_result: dict | None) -> str:
     if mode == "direct":

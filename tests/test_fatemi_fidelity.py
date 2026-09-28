@@ -1,16 +1,22 @@
 """Pins our GraphQA encoders and generator to Fatemi et al. (ICLR 2024).
 
-The encoder strings are quoted verbatim from Appendix A.1 for the Figure 5 running
-example; the generator parameters from Appendix A.4. If these drift, our claim that
+The encoder strings are quoted from Appendix A.1 for the Figure 5 running example, except
+that the incident encoder lists each node's neighbours in ascending order (A.1 prints nodes
+6 and 7 as "7, 5" and "2, 8, 6"); the generator parameters are from Appendix A.4. If these drift, our claim that
 GraphQA numbers are comparable to theirs stops holding.
 """
+from pathlib import Path
+
 import networkx as nx
 import pytest
+import yaml
 
 from gsi.data.base import GraphInstance
-from gsi.data.graphqa import FATEMI_TASKS, GENERATOR_WEIGHTS, GENERATORS, NODE_RANGE, build_graphqa, generate_graph
+from gsi.data.graphqa import GENERATOR_WEIGHTS, GENERATORS, NODE_RANGE, TASKS, build_graphqa, generate_graph
 from gsi.serial.render import render
 from gsi.serial.variant import canonical, restructure
+
+REPO = Path(__file__).resolve().parents[1]
 
 # Figure 5 running example
 FIG5 = GraphInstance(id="fig5", dataset="graphqa", task="node_degree", directed=False, weighted=False,
@@ -60,8 +66,10 @@ def test_generator_families_and_weights_follow_appendix_a4():
 
 
 def test_fatemi_task_set():
-    assert FATEMI_TASKS == ("edge_existence", "node_degree", "node_count", "edge_count",
-                            "connected_nodes", "disconnected_nodes", "cycle_check")
+    fatemi = ["edge_existence", "node_degree", "node_count", "edge_count", "connected_nodes", "disconnected_nodes",
+              "cycle_check"]
+    assert list(TASKS) == fatemi
+    assert yaml.safe_load((REPO / "configs" / "graphqa.yaml").read_text())["datasets"]["graphqa"]["tasks"] == fatemi
 
 
 @pytest.mark.parametrize("kind", GENERATORS)

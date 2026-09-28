@@ -225,3 +225,27 @@ def test_execution_records_its_environment():
     ex = sandbox.run(DECL + BUILD + "ans = G.degree(1)", CANON, "code", timeout=5)
     assert ex.env and ex.env["networkx"] == nx.__version__
     assert ex.env["python"].startswith(".".join(__import__("sys").version.split()[0].split(".")[:2]))
+
+
+def test_a_timeout_is_retried_and_never_cached(tmp_path, monkeypatch):
+    calls = []
+    real = sandbox._execute
+
+    def slow_once(*args):  # the first attempt loses the race against the wall clock
+        calls.append(1)
+        r = real(*args)
+        if len(calls) == 1:
+            r.timed_out, r.exit_code, r.ans = True, -9, None
+        return r
+    monkeypatch.setattr(sandbox, "_execute", slow_once)
+    ex = sandbox.run(DECL + "ans = 3", CANON, "code", timeout=5, cache_dir=tmp_path)
+    assert len(calls) == 2 and not ex.timed_out and ex.ans == "3"
+    assert len(list(tmp_path.glob("*.json"))) == 1  # the retry's result is cached
+
+    ex = sandbox.run("while True:\n    pass\nans = 1", CANON, "code", timeout=1, cache_dir=tmp_path / "loop")
+    assert ex.timed_out and not list((tmp_path / "loop").glob("*.json"))
+
+
+def test_programs_read_an_empty_stdin():
+    ex, cls = run_and_classify(DECL + "n = int(input())\nans = n")
+    assert cls == "execution" and "EOFError" in (ex.exception or "")

@@ -17,9 +17,6 @@ GRAPHQA_SOLUTIONS = {
     "connected_nodes": "sorted(G.neighbors(q['node']))",
     "disconnected_nodes": "sorted(n for n in G.nodes if n != q['node'] and not G.has_edge(q['node'], n))",
     "cycle_check": "not nx.is_forest(G)",
-    "reachability": "nx.has_path(G, q['u'], q['v'])",
-    "shortest_path": "nx.shortest_path_length(G, q['u'], q['v'])",
-    "triangle_counting": "sum(nx.triangles(G).values()) // 3",
 }
 
 ERDOS_SOLUTIONS = {

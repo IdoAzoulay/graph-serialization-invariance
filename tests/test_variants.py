@@ -1,11 +1,12 @@
 import pytest
 
 from gsi.data.graphqa import build_graphqa
-from gsi.serial.parse import parse
 from gsi.serial.render import render
 from gsi.serial.variant import (ADJ_LIST_ORDERINGS, EDGE_LIST_ORDERINGS, IDENTITY, SYNTAXES, axes_differing,
-                                canonical, make_variants, normalize_edges, relabel, relabel_identity, reorder,
-                                same_serialization, to_nx, true_edge_set)
+                                canonical, make_variants, normalize_edges, relabel, relabel_identity, reorder, restructure,
+                                same_serialization, true_edge_set)
+
+from graph_text import parse, to_nx
 
 INSTANCES = build_graphqa(6, seed=3, generators=("er", "ba", "star", "path", "complete", "sbm"), tasks=("node_degree",))
 
@@ -127,3 +128,11 @@ def test_replicated_edge_list_lists_both_directions():
     v = make_variants(inst, canon, {"structure": {"replicated": True}})[1]
     assert v.params["replicated"] and v.axis == "structure"
     assert render(v).count("(") == 2 * len(canon.edge_seq)
+
+
+def test_adjacency_list_round_trip_with_single_neighbour_lines():
+    star = build_graphqa(1, seed=0, generators=("star",), tasks=("node_degree",))[0]
+    v = restructure(canonical(star, structure="edge_list", syntax="graphqa_nl"), structure="adj_list")
+    text = render(v)
+    assert "is connected to node 0." in text  # a leaf has one neighbour
+    assert parse(text, "graphqa_nl", "adj_list", False) == true_edge_set(v)

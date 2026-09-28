@@ -3,7 +3,7 @@ import pytest
 
 from gsi.llm.client import extract_code
 from gsi.score.compare import compare, normalize_answer, relabel_answer
-from gsi.score.parse_answer import find_answer_line, find_boxed_answer, parse_value
+from gsi.score.parse_answer import find_boxed_answer, parse_value
 
 
 @pytest.mark.parametrize("text,expected", [
@@ -18,16 +18,6 @@ from gsi.score.parse_answer import find_answer_line, find_boxed_answer, parse_va
 ])
 def test_find_boxed_answer(text, expected):
     assert find_boxed_answer(text) == expected
-
-
-@pytest.mark.parametrize("text,expected", [
-    ("blah\nANSWER: Yes", "Yes"),
-    ("**ANSWER:** No.", "No"),
-    ("ANSWER: 4\nANSWER: 5", "5"),
-    ("", None),
-])
-def test_find_answer_line(text, expected):
-    assert find_answer_line(text) == expected
 
 
 @pytest.mark.parametrize("s,t,expected", [
