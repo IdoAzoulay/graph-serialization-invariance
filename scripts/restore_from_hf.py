@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -64,14 +65,16 @@ def restore(name: str, revision: str) -> dict[str, int]:
         for batch in pq.ParquetFile(path).iter_batches(batch_size=20_000):
             for row in batch.to_pylist():
                 m = row["model"]
-                if m not in files:
-                    files[m] = (out_dir / f"{m}.jsonl").open("w")
+                if m not in files:  # written next to the target and renamed at the end: never half a file
+                    files[m] = (out_dir / f".{m}.jsonl.part").open("w")
                     counts[m] = 0
                 files[m].write(json.dumps(to_scored(row)) + "\n")
                 counts[m] += 1
     finally:
         for f in files.values():
             f.close()
+    for m in files:
+        os.replace(out_dir / f".{m}.jsonl.part", out_dir / f"{m}.jsonl")
     return counts
 
 

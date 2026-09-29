@@ -8,7 +8,7 @@ This folder holds the experiments built on top of the main measurement: the nois
 | E1/E2 | `scripts/permutation_signal.py` | `results/<ds>/permutation_signal.csv` | Disagreement across permutations as an error detector (E1), and majority voting with and without abstention (E2) | scored records only; offline |
 | E3 | `scripts/canonical_labeling.py` | `results/<ds>/canonical_labeling.csv`, `canonical_labeling_invariance.csv` | Rendering every relabeling and reordering to one canonical prompt; `--invariance-only` checks the schemes without a model | new prompts (model calls, or the HF config `canonical_labeling`); `--invariance-only` is offline |
 | E5 | `scripts/solver_per_task.py` | `results/<ds>/solver_per_task.csv` | One program per task, with no graph in the prompt, run on every instance | one model call per task and arm (HF config `solver_per_task`), then the sandbox |
-| E6 | `scripts/program_voting.py` | `results/<ds>/program_voting.csv` | Running every variant's M2 program on the canonical graph and voting over their outputs | the M2 programs (the `code` column of the HF records) and the sandbox; no model calls |
+| E6 | `scripts/program_voting.py` | `results/<ds>/program_voting.csv` | Running every variant's M2 program on the canonical graph and voting over their outputs | `results/<ds>/responses/<model>.jsonl` (the M2 programs; the HF records hold them in their `code` column, but no script here restores that file) and the sandbox; no model calls |
 
 `<ds>` is `graphqa` or `erdos`. The scripts write their tables straight into `mitigation/results/<ds>/`. Intermediate records (`results/<ds>/scored_canon/`, `results/<ds>/scored_solver/`, the reply cache `results/cache/`) are git-ignored.
 
@@ -26,17 +26,18 @@ Run the tests with `python -m pytest mitigation/tests`. The main suite (`python 
 
 ## Rerunning
 
-Every command runs from the repository root. Only E1/E2, E3 `--invariance-only` and E6 can run without model calls. E6 needs `results/<ds>/responses/<model>.jsonl`, which is not restored by `scripts/restore_from_hf.py`.
+Every command runs from the repository root. Only E1/E2, E3 `--invariance-only` and E6 can run without model calls. E1/E2 need the scored records (`scripts/restore_from_hf.py`); E3 needs the variants, which are git-ignored and rebuilt offline by the first command below; E6 needs `results/<ds>/responses/<model>.jsonl`, which is not restored by `scripts/restore_from_hf.py`.
 
 ```bash
 python mitigation/scripts/permutation_signal.py --config configs/graphqa.yaml \
     --models hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b hf-deepseek-v4-flash
+python scripts/run.py --config configs/graphqa.yaml --stages variants
 python mitigation/scripts/canonical_labeling.py --config configs/graphqa.yaml --invariance-only
 ```
 
 With the scored records restored (`scripts/restore_from_hf.py`), both commands reproduce the committed tables byte for byte. The model order sets the row order.
 
-The committed tables of E0, E3, E5 and E6 come from the runs described in the paper. Rerunning them calls the models for every reply that is not in `results/cache/`.
+The committed tables of E0, E3, E5 and E6 come from the runs described in the paper. Rerunning E0, E3 or E5 calls the models for every reply that is not in `results/cache/`; E6 only runs programs.
 
 ## Removing the mitigation experiments
 

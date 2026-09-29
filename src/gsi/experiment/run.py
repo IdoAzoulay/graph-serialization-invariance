@@ -3,11 +3,13 @@ LLM responses are cached by prompt hash, executions by code hash, and each JSONL
 already holds. A stored response whose prompt has changed since is dropped and asked again.
 
 The data stage writes data/processed/<config>/instances.jsonl only when it does not exist: the committed
-instances pin the sampled graphs (GraphQA's SBM generator draws different graphs under networkx 3.7, and the
-Erdős download is not versioned). --rebuild-data regenerates them on purpose."""
+instances pin the sampled graphs (GraphQA's SBM generator draws different graphs under networkx 3.7).
+--rebuild-data regenerates them on purpose. An execution is redone when its program or the graph it runs on
+has changed since."""
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -45,15 +47,15 @@ def load_dotenv(root: Path) -> None:
     if not p.exists():
         return
     for line in p.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+        if not line.strip() or line.strip().startswith("#") or "=" not in line:
             continue
-        k, v = line.split("=", 1)
-        v = v.strip()
+        k, raw = line.split("=", 1)
+        v = raw.strip()
         if v[:1] in ("'", '"'):
             v = v[1:v.index(v[0], 1)] if v[0] in v[1:] else v[1:]
         else:
-            v = re.split(r"(?:^|\s+)#", v, maxsplit=1)[0].strip()  # an unquoted value ends at a comment
+            # as in a shell, "#" starts a comment only after whitespace: KEY=abc  # note -> "abc", KEY=#abc -> "#abc"
+            v = re.split(r"\s+#", raw, maxsplit=1)[0].strip()
         os.environ.setdefault(k.strip(), v)
 
 
@@ -173,6 +175,10 @@ def make_client(spec: ModelSpec, cache_dir: Path):
 
 # ---------------- llm stage ----------------
 
+class Skipped(Exception):
+    """A record whose prompt already failed in this run."""
+
+
 def drop_records(path: Path, record_ids: set[str]) -> int:
     """Remove the rows with these record_ids from a JSONL sink; returns how many were removed."""
     if not path.exists() or not record_ids:
@@ -184,9 +190,10 @@ def drop_records(path: Path, record_ids: set[str]) -> int:
 
 
 def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit: int | None = None) -> int:
-    """Ask every prompt not answered yet; returns the number of failed calls."""
+    """Ask every prompt not answered yet; returns the number of records left unanswered."""
     client = make_client(spec, cfg.cache_dir)
     out = cfg.results_dir / "responses" / f"{spec.name}.jsonl"
+    trim_partial_line(out)  # a killed run can leave half a row
     stored = {r["record_id"]: r.get("prompt_hash") for r in read_jsonl(out)}
     todo, stale = [], set()
     for inst in instances:
@@ -200,26 +207,28 @@ def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit
     if stale:
         # The record_id names the instance, form, arm and model, not the prompt text, so a prompt that
         # changed since (new instances, a template edit) must not be answered by the old reply.
-        n = drop_records(out, stale)
-        n_exec = drop_records(cfg.results_dir / "exec" / f"{spec.name}.jsonl", stale)
-        log(f"[llm:{spec.name}] {n} stored responses (and {n_exec} executions) answer an older prompt; asking again")
+        # (their executions are redone by the exec stage, whose signature covers the program)
+        log(f"[llm:{spec.name}] {drop_records(out, stale)} stored responses answer an older prompt; asking again")
     sink = Sink(out)
     jobs = [j for j in todo if not sink.has(j[0])]
     if limit:
         jobs = jobs[:limit]
     log(f"[llm:{spec.name}] {len(jobs)} prompts to run ({len(sink.ids)} already done)")
-    errors = 0
-    failed: set[str] = set()   # prompt hashes that already failed in this run: not sent again
+    errors = skipped = 0
+    # A prompt shared by many records (up to ~1,300 for one Graph-as-Code prompt) that has just failed is not
+    # sent again for each of them in this run: those records are skipped, not counted as errors.
+    failed: set[str] = set()
 
     def work(job):
         rid, p, inst, v = job
         if p.prompt_hash in failed:
-            raise RuntimeError(f"prompt {p.prompt_hash[:12]} already failed in this run")
+            raise Skipped(p.prompt_hash)
         try:
             r = client.complete(p, context={"inst": inst, "variant": v})
         except Exception:
             failed.add(p.prompt_hash)
             raise
+        failed.discard(p.prompt_hash)  # a later attempt of the same prompt succeeded
         row = {"record_id": rid, "instance_id": inst.id, "variant_id": v.variant_id, "mode": p.mode,
                "library": p.library, **r.to_dict()}
         sink.write(row)
@@ -233,13 +242,16 @@ def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit
             try:
                 cached += bool(fut.result())
                 recent.append(False)
+            except Skipped:
+                skipped += 1
             except Exception as e:
                 errors += 1
                 recent.append(True)
                 log(f"[llm:{spec.name}] error on {futs[fut][0]}: {e!r}")
             done += 1
             if done % 50 == 0 or done == len(jobs):
-                log(f"[llm:{spec.name}] {done}/{len(jobs)} done, {cached} from cache, {errors} errors")
+                log(f"[llm:{spec.name}] {done}/{len(jobs)} done, {cached} from cache, {errors} errors, "
+                    f"{skipped} skipped after their prompt failed")
             # A sustained error rate means something systemic -- exhausted credits (402), a dead
             # endpoint, a bad key -- and spinning through the remaining jobs only fills the log.
             # Stop; the sink has everything that succeeded and a re-run resumes from there.
@@ -249,23 +261,37 @@ def stage_llm(cfg: ExperimentConfig, spec: ModelSpec, instances, variants, limit
                 raise RuntimeError(f"[llm:{spec.name}] aborting: {sum(recent)} of the last {len(recent)} calls "
                                    f"failed ({errors} in all, {cancelled} jobs cancelled); fix the cause and "
                                    f"re-run to resume")
-    return errors
+    return errors + skipped
 
 
 # ---------------- exec stage ----------------
 
+def exec_signature(code: str, v: Variant, mode: str) -> str:
+    """What an execution depends on: the program, the mode and the graph it runs on. A Graph-as-Code prompt does
+    not contain the graph, so a changed graph leaves the prompt, and the reply, as they were."""
+    payload = json.dumps([code, mode, v.node_seq, v.edge_seq, v.directed, v.weighted])
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def stage_exec(cfg: ExperimentConfig, spec: ModelSpec, variants) -> None:
     by_id = {v.variant_id: v for vs in variants.values() for v in vs}
-    responses = [r for r in read_jsonl(cfg.results_dir / "responses" / f"{spec.name}.jsonl") if r["mode"] in CODE_MODES]
-    sink = Sink(cfg.results_dir / "exec" / f"{spec.name}.jsonl")
-    jobs = [r for r in responses if r.get("code") and not sink.has(r["record_id"])]
+    responses = [r for r in read_jsonl(cfg.results_dir / "responses" / f"{spec.name}.jsonl")
+                 if r["mode"] in CODE_MODES and r.get("code")]
+    sig = {r["record_id"]: exec_signature(r["code"], by_id[r["variant_id"]], r["mode"]) for r in responses}
+    out = cfg.results_dir / "exec" / f"{spec.name}.jsonl"
+    trim_partial_line(out)
+    stale = {r["record_id"] for r in read_jsonl(out) if r["record_id"] in sig and r.get("exec_sig") != sig[r["record_id"]]}
+    if stale:
+        log(f"[exec:{spec.name}] {drop_records(out, stale)} executions ran another program or graph; running again")
+    sink = Sink(out)
+    jobs = [r for r in responses if not sink.has(r["record_id"])]
     log(f"[exec:{spec.name}] {len(jobs)} programs to run ({len(sink.ids)} already done)")
     timeout, mem = cfg.exec.get("timeout", 20), cfg.exec.get("mem_mb", 1024)
 
     def work(r):
         ex = sandbox.run(r["code"], by_id[r["variant_id"]], r["mode"], timeout=timeout, mem_mb=mem,
                          cache_dir=cfg.cache_dir / "exec")
-        sink.write({"record_id": r["record_id"], **ex.to_dict()})
+        sink.write({"record_id": r["record_id"], "exec_sig": sig[r["record_id"]], **ex.to_dict()})
 
     with ThreadPoolExecutor(max_workers=cfg.exec.get("workers", os.cpu_count() or 2)) as pool:
         futs = [pool.submit(work, r) for r in jobs]
@@ -395,7 +421,7 @@ def main(argv=None) -> None:
             stage_score(cfg, spec, instances, variants)
     if errors:
         # the records that failed are missing; a re-run asks only them
-        raise SystemExit(f"{errors} model calls failed; re-run the same command to retry them")
+        raise SystemExit(f"{errors} records have no reply (failed calls); re-run the same command to retry them")
 
 
 if __name__ == "__main__":

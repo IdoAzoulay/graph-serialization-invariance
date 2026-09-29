@@ -73,7 +73,9 @@ def failure_stacks(fail: pd.DataFrame, out: Path) -> None:
         return
     classes = [c for c in CLASS_ORDER if c in fail.columns]
     for (dataset, model), sub in fail.groupby(["dataset", "model"]):
-        sub = sub.assign(arm=_arm(sub)).set_index(["arm", "axis"])[classes]
+        # only the classes this model has: the combined and the per-model runs write the same file
+        cols = [c for c in classes if sub[c].fillna(0).any()]
+        sub = sub.assign(arm=_arm(sub)).set_index(["arm", "axis"])[cols]
         ax = sub.plot.bar(stacked=True, figsize=(0.9 * len(sub) + 3, 4), rot=45)
         ax.set_ylabel("share of failures")
         ax.set_title(f"Failure decomposition among code-mode failures - {dataset}, {model}")

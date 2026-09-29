@@ -36,12 +36,12 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/erdos_m3fix/tables/compare/*.csv`: before/after the graph-type sentence | `scripts/m3fix_compare.py` |
 | `results/erdos_m3fix/tables/ablation/*.csv`: graph-type omission ablation | `scripts/graph_type_ablation.py` |
 | `results/review/{summary.json,paired_intervals.csv}`: descriptive audit, paired graph bootstrap | `scripts/audit_results.py` |
-| `results/review/paper_metrics.json`: every number the paper reports for the main experiment | `scripts/paper_metrics.py` |
+| `results/review/paper_metrics.json`: the paper's metric set for the main experiment | `scripts/paper_metrics.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
 
-Every CSV and JSON file comes out byte-identical to the committed one. The figures can differ in bytes (Matplotlib version and timestamps) but not in content. Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2.
+Every CSV and JSON file comes out byte-identical to the committed one, and so do the figures' contents (their bytes carry the Matplotlib version and a timestamp). Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2.
 
-Figures 5 and 6 of the paper (`paper/figures/make_figures.py`) draw the values printed in the paper, not the current `paper_metrics.json`.
+The paper's text and its Figures 5 and 6 (hardcoded in `paper/figures/make_figures.py`) predate the fixes to `scripts/paper_metrics.py` in commit d987c4f, whose message lists what they changed; a few printed numbers therefore differ from the current `paper_metrics.json`.
 
 Tests: `.venv/bin/python -m pytest` (the main suite, about 35 s, no network) and `.venv/bin/python -m pytest mitigation/tests`.
 

@@ -246,6 +246,16 @@ def test_a_timeout_is_retried_and_never_cached(tmp_path, monkeypatch):
     assert ex.timed_out and not list((tmp_path / "loop").glob("*.json"))
 
 
-def test_programs_read_an_empty_stdin():
+def test_programs_read_an_empty_stdin(monkeypatch):
+    """The program must not read the harness's stdin (what it would read depends on how the run was launched)."""
+    import subprocess
+    seen = []
+    real = subprocess.Popen
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("stdin"))
+        return real(*args, **kwargs)
+    monkeypatch.setattr(sandbox.subprocess, "Popen", spy)
     ex, cls = run_and_classify(DECL + "n = int(input())\nans = n")
+    assert seen == [subprocess.DEVNULL]
     assert cls == "execution" and "EOFError" in (ex.exception or "")

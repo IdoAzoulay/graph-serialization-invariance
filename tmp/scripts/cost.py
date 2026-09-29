@@ -3,8 +3,8 @@
 Uses usage.estimated_cost where the provider reports it (deepinfra, together) and RATES
 otherwise (novita, featherless, nscale do not report). Run at any point during a run:
 
-    python scripts/cost.py                    # every model in the cache
-    python scripts/cost.py hf-deepseek-v3.1-novita
+    python tmp/scripts/cost.py                    # every model in the cache
+    python tmp/scripts/cost.py hf-deepseek-v3.1-novita
 """
 from __future__ import annotations
 

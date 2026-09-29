@@ -10,37 +10,40 @@
 # content. The mitigation experiments are not rerun here (see mitigation/README.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PY=${PYTHON:-.venv/bin/python}
-[ -x "$PY" ] || PY=.venv/Scripts/python   # Windows venv layout
-[ -x "$PY" ] || PY=python
+# the interpreter: $PYTHON if set, else the project venv (POSIX or Windows layout), else python3
+if [ -n "${PYTHON:-}" ]; then PY=$(command -v "$PYTHON")
+elif [ -x .venv/bin/python ]; then PY=.venv/bin/python
+elif [ -x .venv/Scripts/python ]; then PY=.venv/Scripts/python
+else PY=$(command -v python3 || command -v python)
+fi
 # No key reaches any client, and the dataset is downloaded anonymously (not with a stored login).
 export DEEPSEEK_API_KEY= OPENROUTER_API_KEY= HF_TOKEN= HF_HUB_DISABLE_IMPLICIT_TOKEN=1 MPLBACKEND=Agg
 MODELS=(hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b hf-deepseek-v4-flash)
 step() { echo "=== $(date '+%T') $*"; }
 
 step "download the scored records (results/<dataset>/scored/)"
-$PY scripts/restore_from_hf.py
+"$PY" scripts/restore_from_hf.py
 
 for cfg in graphqa erdos erdos_m3fix; do
   step "$cfg: tables and figures (results/$cfg/)"
-  $PY scripts/analyze.py --config configs/$cfg.yaml > /dev/null
+  "$PY" scripts/analyze.py --config configs/$cfg.yaml > /dev/null
   if [ "$cfg" != erdos_m3fix ]; then
-    $PY scripts/analyze.py --config configs/$cfg.yaml --models "${MODELS[@]}" > /dev/null
+    "$PY" scripts/analyze.py --config configs/$cfg.yaml --models "${MODELS[@]}" > /dev/null
   fi
 done
 
 step "graph-type rerun: before/after and ablation (results/erdos_m3fix/tables/{compare,ablation}/)"
-$PY scripts/m3fix_compare.py > /dev/null
-$PY scripts/graph_type_ablation.py > /dev/null
+"$PY" scripts/m3fix_compare.py > /dev/null
+"$PY" scripts/graph_type_ablation.py > /dev/null
 
 step "paired graph bootstrap (results/review/{summary.json,paired_intervals.csv,per_instance.csv})"
-$PY scripts/audit_results.py > /dev/null
+"$PY" scripts/audit_results.py > /dev/null
 
 step "paper metrics (results/review/paper_metrics.json; about 2 minutes)"
-$PY scripts/paper_metrics.py > /dev/null
+"$PY" scripts/paper_metrics.py > /dev/null
 
 step "paper figures (paper/figures/)"
-$PY paper/figures/make_figures.py > /dev/null
+"$PY" paper/figures/make_figures.py > /dev/null
 
 if [ "${1:-}" = "--pdf" ]; then
   step "paper PDF (paper/main.pdf)"

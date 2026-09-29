@@ -73,3 +73,18 @@ def test_filtered_analysis_preserves_other_models_and_combined_tables(tmp_path, 
     assert snapshot(tables / "model-a") == first
     assert snapshot(tables / "model-b") == second
     assert snapshot(tables) == combined
+
+
+def test_failure_figure_is_the_same_from_the_combined_and_the_per_model_run(tmp_path):
+    """Both runs write figs/failures_<dataset>_<model>.png; a class another model has must not change it."""
+    from gsi.analysis.figures import failure_stacks
+    one = pd.DataFrame({"dataset": ["d", "d"], "mode": ["code", "code"], "library": ["native", "native"],
+                        "axis": ["relabel", "order"], "model": ["a", "a"], "logic": [0.6, 1.0],
+                        "execution": [0.4, 0.0], "n_failures": [5, 3]})
+    both = pd.concat([one.assign(construction=0.0),
+                      one.assign(model="b", logic=[0.5, 0.5], execution=[0.0, 0.0], construction=[0.5, 0.5])])
+    for d in ("per_model", "combined"):
+        (tmp_path / d).mkdir()
+    failure_stacks(one, tmp_path / "per_model")
+    failure_stacks(both, tmp_path / "combined")
+    assert (tmp_path / "per_model" / "failures_d_a.png").read_bytes() == (tmp_path / "combined" / "failures_d_a.png").read_bytes()

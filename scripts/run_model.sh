@@ -24,10 +24,13 @@ sys.exit(subprocess.call(cmd))' "$@"
 echo "=== $(date '+%F %T') START model=$MODEL host=$(hostname) ==="
 for cfg in graphqa erdos erdos_m3fix; do
   echo "=== $(date '+%F %T') $cfg: llm ==="
-  caffeinate -i $PY scripts/run.py --config configs/$cfg.yaml --models "$MODEL" --stages data,variants,llm || { echo "=== llm stage failed for $cfg; stopping ==="; exit 2; }
+  # A non-zero exit means some calls failed (or the run aborted); run and score what was answered anyway, and
+  # re-run this script later to retry the rest.
+  caffeinate -i $PY scripts/run.py --config configs/$cfg.yaml --models "$MODEL" --stages data,variants,llm || { echo "=== llm stage for $cfg left records unanswered; continuing ==="; FAILED=1; }
   echo "=== $(date '+%F %T') $cfg: exec,score ==="
   caffeinate -i $PY scripts/run.py --config configs/$cfg.yaml --models "$MODEL" --stages exec,score || { echo "=== exec/score failed for $cfg; stopping ==="; exit 3; }
   echo "=== $(date '+%F %T') $cfg: analyze ==="
   $PY scripts/analyze.py --config configs/$cfg.yaml --models "$MODEL" > "results/$cfg/analyze_$MODEL.txt" 2>&1 || echo "=== analyze failed for $cfg (non-fatal) ==="
 done
 echo "=== $(date '+%F %T') ALL DONE model=$MODEL ==="
+exit "${FAILED:-0}"

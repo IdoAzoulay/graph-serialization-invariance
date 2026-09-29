@@ -50,40 +50,36 @@ def write_jsonl(path: str | Path, rows: Iterable[dict]) -> None:
 
 
 def read_jsonl(path: str | Path) -> Iterator[dict]:
-    """Rows of a JSONL file. A final line cut off mid-write (a killed run) is skipped with a warning, so the
-    run can resume; a malformed line anywhere else is an error."""
     path = Path(path)
     if not path.exists():
         return
     with path.open() as f:
-        pending = None
         for line in f:
             line = line.strip()
-            if not line:
-                continue
-            if pending is not None:
-                yield json.loads(pending)
-            pending = line
-        if pending is not None:
-            try:
-                row = json.loads(pending)
-            except json.JSONDecodeError:
-                print(f"warning: {path}: skipping a truncated last line", file=sys.stderr)
-                return
-            yield row
+            if line:
+                yield json.loads(line)
 
 
 def trim_partial_line(path: str | Path) -> bool:
-    """Cut a final line that was not terminated (a killed writer) so that appends start on a new line."""
+    """Repair the end of a JSONL file that a killed writer left without a final newline, so that appends start
+    on a new line: a complete last row gets its newline, a row cut off mid-write is removed. Returns whether a
+    row was removed."""
     path = Path(path)
     if not path.exists() or path.stat().st_size == 0:
         return False
     data = path.read_bytes()
     if data.endswith(b"\n"):
         return False
-    path.write_bytes(data[:data.rfind(b"\n") + 1])
-    print(f"warning: {path}: removed a truncated last line", file=sys.stderr)
-    return True
+    start = data.rfind(b"\n") + 1
+    try:
+        json.loads(data[start:])
+    except ValueError:
+        path.write_bytes(data[:start])
+        print(f"warning: {path}: removed a row cut off mid-write", file=sys.stderr)
+        return True
+    with path.open("ab") as f:
+        f.write(b"\n")
+    return False
 
 
 def append_jsonl(path: str | Path, row: dict) -> None:
