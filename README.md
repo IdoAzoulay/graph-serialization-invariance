@@ -23,7 +23,7 @@ git clone https://github.com/dolev98/graph-serialization-invariance.git
 cd graph-serialization-invariance
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev,reproduce]"
-scripts/reproduce.sh          # about 5 minutes; add --pdf to rebuild paper/main.pdf with latexmk
+scripts/reproduce.sh          # 5-10 minutes; add --pdf to rebuild paper/main.pdf with latexmk
 git status                    # CSV/JSON outputs: no changes expected
 ```
 
@@ -37,14 +37,25 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/erdos_m3fix/tables/ablation/*.csv`: graph-type omission ablation | `scripts/graph_type_ablation.py` |
 | `results/review/{summary.json,paired_intervals.csv}`: descriptive audit, paired graph bootstrap | `scripts/audit_results.py` |
 | `results/review/paper_metrics.json`: the paper's metric set for the main experiment | `scripts/paper_metrics.py` |
-| `results/review/floor/floor_stats_*.csv`: the repeat floor against the flip rates (Section 5.1, Appendix D) | `scripts/floor_stats.py` |
+| `results/review/floor/floor_stats_*.csv`: the repeat floor against the flip rates (Section 5.1, Appendix C), from the committed repeat answers in `results/review/floor/<dataset>/` | `scripts/floor_stats.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
 
-Every CSV and JSON file comes out byte-identical to the committed one, and so do the figures' contents (their bytes carry the Matplotlib version and a timestamp). Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2.
+Every CSV and JSON file comes out byte-identical to the committed one, and so do the figures' contents (their bytes carry the Matplotlib version and a timestamp). Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2; an older stack (Python 3.11, numpy 2.4, scipy 1.17) changes the last digit of three p-values in `paper_metrics.json` and of one value near 1e-18 in `floor_stats_literal_cells.csv`, and nothing else.
 
-Every figure reads its numbers from `paper_metrics.json`. The figure files keep their original names; in the paper they are Figure 1 (`fig2_flip_by_mode`), Figure 2 (`fig4_graph_size`), Figures B1-B5 (`fig3_weighted_by_mode`, `figB1_flip_by_model`, `figB2_weighted_by_model`, `fig5_where_flips_start`, `fig6_other_reading`) and Figure D1 (`fig1_tuple`). The LaTeX source in `paper/` is still the version of the snapshot, written before commit d987c4f fixed four metric computations, so some of its printed numbers differ from `paper_metrics.json`; the final paper replaces it.
+Every number the paper prints comes from a committed output, most of them from `results/review/paper_metrics.json` (the comments in `scripts/paper_metrics.py` name the table, figure or section each part serves). Figures 1, 2 and B1-B5 read their numbers from it; Figure C1, one worked tuple, has its four answers typed in. The figure files keep their original names:
 
-Tests: `.venv/bin/python -m pytest` (about 45 s, no network).
+| Paper | File |
+|---|---|
+| Figure 1, Figure B1 | `fig2_flip_by_mode`, `fig3_weighted_by_mode` |
+| Figure 2 | `fig4_graph_size` |
+| Figures B2, B3 | `figB1_flip_by_model`, `figB2_weighted_by_model` |
+| Figure B4 | `fig5_where_flips_start` |
+| Figure B5 | `fig6_other_reading` (flips in which every serialization is answered) |
+| Figure C1 | `fig1_tuple` |
+
+Rebuilding the PDF (`--pdf`) needs `latexmk` and TeX Live with the recommended, extra and science packages and the `inconsolata` font. The figures use Times New Roman; without it Matplotlib falls back to STIX, and the figures differ from the committed ones in their font.
+
+Tests: `.venv/bin/python -m pytest` (159 tests, about a minute, no network).
 
 ## Repository layout
 
@@ -62,10 +73,9 @@ scripts/            command-line entry points (see the table above and "Running 
 configs/            experiment configs (graphqa, erdos, erdos_m3fix, smoke) and models.yaml
 data/processed/     the sampled instances (instances.jsonl), pinned so the graphs never drift
 results/            committed tables and figures; scored records are restored here (git-ignored)
-paper/              LaTeX source, figures and the compiled PDF
-tests/              pytest suite for the main pipeline
-tmp/                files probably no longer needed (the pilot config, unused model entries, a cost
-                    monitor); see tmp/README.md
+  review/           paper_metrics.json, the audit, and floor/: the repeat-floor answers and statistics
+paper/              LaTeX source, figures (make_figures.py) and the compiled PDF
+tests/              pytest suite
 ```
 
 ## Running the pipeline from scratch
@@ -77,7 +87,11 @@ python scripts/run.py --config configs/smoke.yaml --models stub     # offline en
 python scripts/run.py --config configs/graphqa.yaml --estimate      # prompt and token counts, no calls
 python scripts/run.py --config configs/graphqa.yaml --models hf-qwen3-8b-nscale --stages variants,llm,exec,score
 python scripts/analyze.py --config configs/graphqa.yaml
+python scripts/nondeterminism_floor.py --config configs/erdos.yaml --models <models> --instances 100 --repeats 4 \
+    --out results/review/floor/erdos/noise_floor.json --per-instance results/review/floor/erdos/noise_floor_instances.jsonl
 ```
+
+The last command re-asks the reference prompts to measure the repeat floor; `scripts/floor_stats.py` then compares it with the flip rates.
 
 Replies are cached under `results/cache/<model>/<prompt_hash>.json`, and every stage resumes where it stopped. A stored reply whose prompt has changed is asked again. The `data` stage keeps the committed `data/processed/<dataset>/instances.jsonl`. `--rebuild-data` regenerates it, but GraphQA's SBM graphs come out different under networkx 3.7 or later, and Erdős is downloaded from `PKU-ML/Erdos` at a pinned revision.
 

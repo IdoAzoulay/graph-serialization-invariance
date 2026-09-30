@@ -157,13 +157,15 @@ def main() -> None:
                 for axis in ("relabel", "order"):
                     # relabel is judged against the sorted-identity reference where it exists;
                     # order/structure/syntax against canonical -- mirror invariance_table
-                    if axis == "relabel" and ref == "canonical" and any("identity" in refs[k[0]] for k in keys):
-                        continue
                     if axis == "order" and ref == "identity":
                         continue
                     flips, floors = [], []
                     for k in keys:
                         iid = k[0]; ref_v = refs[iid][ref]
+                        # per instance: an instance whose identity relabeling reads exactly like canonical has
+                        # no separate identity reference, and its relabelings are judged against canonical
+                        if axis == "relabel" and ref == "canonical" and "identity" in refs[iid]:
+                            continue
                         forms = [v for v in variants[iid] if v.axis == axis and v.variant_id != ref_v.variant_id]
                         got = [scored[record_id(v, mode, lib, name)]["answer_key"] for v in forms + [ref_v]
                                if record_id(v, mode, lib, name) in scored]

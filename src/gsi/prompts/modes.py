@@ -148,7 +148,7 @@ def _graph_notes(inst: GraphInstance, state_undirected: bool = False) -> str:
         # M3 removes the graph text, and this function only ever noted directedness, so an
         # undirected M3 prompt stated its type only if the task preamble did. Where the preamble is
         # silent or mentions only the directed case (Erdős `neighbor`), models read the graph as
-        # directed (paper, Section 5.5). This states the type explicitly so
+        # directed (paper, Section 5.4). This states the type explicitly so
         # the control receives the same fact as M1/M2. Off by default so the original runs stay
         # reproducible.
         notes += UNDIRECTED_NOTE

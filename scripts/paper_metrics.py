@@ -42,8 +42,8 @@ import statsmodels.formula.api as smf
 from scipy.stats import binomtest, wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from gsi.analysis.tuples import (READING_TASKS, divergence_site, durkalski, failure_step, is_double, like_for_like,
-                                 reading_tag, spread)
+from gsi.analysis.tuples import (READING_TASKS, crash_only_flip, divergence_site, durkalski, failure_step, is_double,
+                                 like_for_like, reading_tag, spread)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ["graphqa", "erdos"]
@@ -151,9 +151,13 @@ def build_tuples(j):
             if flip and arm.startswith("code/") and axis in ("relabel", "order") and task in READING_TASKS:
                 reading.append(dict(dataset=ds, task=task, model=model, instance_id=iid, with_crash=not all_answered,
                                     answers=[json.loads(k) for k in keys if k != "NA"]))
+            # a NetworkX syntax flip that only the NetworkX-code serialization's crash makes (Section 5.2)
+            nx_crash = None
+            if flip and arm == "code/networkx" and axis == "syntax":
+                nx_crash = crash_only_flip(keys, sub["variant_id"].tolist(), "::syntax:networkx_code")
             rows.append(dict(dataset=ds, task=task, instance_id=iid, cluster=cluster.get(iid, iid), model=model,
                              arm=arm, axis=axis, n=n, bucket=bucket, flip=flip, D=D, robust=all(corr),
-                             S=S, doubled=doubled, where=where))
+                             S=S, doubled=doubled, where=where, nx_crash=nx_crash))
     return pd.DataFrame(rows), reading
 
 
@@ -184,6 +188,22 @@ for (ds, arm, fac), d in F.groupby(["dataset", "arm", "factor"]):
         one_off_pct_of_4member_flips=round(100 * ((flips.n == 4) & (flips.D == 0.5)).sum() / max((flips.n == 4).sum(), 1), 1),
         all_different_pct_of_4member_flips=round(100 * ((flips.n == 4) & (flips.D == 1)).sum() / max((flips.n == 4).sum(), 1), 1))
 out["invariance"] = inv
+
+# Section 5.2: NetworkX code's syntax flips caused by the two crashes of the NetworkX-code serialization (Qwen3-8B
+# leaves out the import, DeepSeek-V4-Flash uses a G it never defines): that serialization gives no answer and every
+# other one is answered. The rate without them keeps the four models weighted equally.
+CRASH_MODELS = ("hf-qwen3-8b-nscale", "hf-deepseek-v4-flash")
+nx_crash_out = {}
+for ds in DATASETS:
+    sx = T[(T.dataset == ds) & (T.arm == "code/networkx") & (T.axis == "syntax")]
+    crash = sx.flip & (sx.nx_crash == True) & sx.model.isin(CRASH_MODELS)  # noqa: E712
+    nx_crash_out[ds] = dict(
+        tuples=int(len(sx)), flips=int(sx.flip.sum()), crash_flips=int(crash.sum()),
+        crash_flips_by_model={m: int(crash[sx.model == m].sum()) for m in CRASH_MODELS},
+        crash_share_of_flips_pct=round(100 * crash.sum() / sx.flip.sum(), 1),
+        flip_rate_pct=round(100 * sx.flip.groupby(sx.model).mean().mean(), 1),
+        flip_rate_without_crashes_pct=round(100 * (sx.flip & ~crash).groupby(sx.model).mean().mean(), 1))
+out["networkx_syntax_crash_flips"] = nx_crash_out
 
 # per model flip rates (the spread across models), relabel+order
 pm = F[F.factor == "relabel+order"].groupby(["dataset", "arm", "model"]).flip.mean().mul(100).round(1)
@@ -485,7 +505,7 @@ out["mcnemar_m2_vs_m3_by_axis_summary"] = mc_axis_sum
 # ---------------------------------------------------------------- performance of every mode (Tables 3 and E1)
 # accuracy: every serialization the mode answered; like_for_like_accuracy: the reference, relabelings and edge
 # orders only (tuples.like_for_like), the serializations every mode is compared on; robust_accuracy and flip_rate:
-# relabel+order tuples. Table 3 takes Erdős M3 from erdos_rerun, Table E1 from erdos.
+# relabel+order tuples. Table 3 takes Erdős M3 from erdos_rerun, Table D1 from erdos.
 def mode_summary(a, t):
     lfl, ro = a[a.axis.map(like_for_like)], t[t.axis.isin(PERM)]
     return dict(answers=int(len(a)), accuracy=round(100 * a.correct.mean(), 1), like_for_like_answers=int(len(lfl)),
@@ -523,7 +543,7 @@ out["dagger_cells"] = [dict(dataset=ds, factor=fac, model=model, arm=arm, code_f
                        for (ds, fac, model, arm), v in fr.items()
                        if arm != "direct" and v - fr[(ds, fac, model, "direct")] >= 1]
 
-# ---------------------------------------------------------------- tuple sizes (Table D1)
+# ---------------------------------------------------------------- tuple sizes (Table C1)
 # Answers per tuple follow from the serializations alone, so every model and mode has the same sizes.
 sizes = {}
 for (ds, ax), d in M12.groupby(["dataset", "axis"]):

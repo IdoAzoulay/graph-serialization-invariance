@@ -11,6 +11,15 @@
     "disagreed": 27,
     "disagreed_with_unparsable": 3,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.2,
+     "excess_over_floor": 0.2,
+     "ci95": [
+      -0.19200000000000006,
+      0.5920000000000001
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.48,
@@ -43,6 +52,15 @@
     "disagreed": 27,
     "disagreed_with_unparsable": 26,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.4,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.38,
@@ -75,6 +93,15 @@
     "disagreed": 0,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.08,
@@ -109,6 +136,15 @@
     "disagreed": 7,
     "disagreed_with_unparsable": 2,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.11,
@@ -141,6 +177,15 @@
     "disagreed": 1,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.2,
+     "excess_over_floor": 0.2,
+     "ci95": [
+      -0.192,
+      0.5920000000000001
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.05,
@@ -173,6 +218,15 @@
     "disagreed": 1,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.03,
@@ -207,6 +261,15 @@
     "disagreed": 1,
     "disagreed_with_unparsable": 1,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.04,
@@ -239,6 +302,15 @@
     "disagreed": 0,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.03,
@@ -271,6 +343,15 @@
     "disagreed": 0,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.02,
@@ -305,6 +386,15 @@
     "disagreed": 14,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.18,
@@ -337,6 +427,15 @@
     "disagreed": 1,
     "disagreed_with_unparsable": 0,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.04,
@@ -369,6 +468,15 @@
     "disagreed": 3,
     "disagreed_with_unparsable": 2,
     "dropped": 0,
+    "obs_relabel": {
+     "n": 5,
+     "flip_rate": 0.0,
+     "excess_over_floor": 0.0,
+     "ci95": [
+      0.0,
+      0.0
+     ]
+    },
     "obs_order": {
      "n": 100,
      "flip_rate": 0.03,

@@ -62,7 +62,7 @@ def ci_handle(ax, label="95% interval"):
     return h
 
 
-# ---------------------------------------------------------------- Figure 1: one tuple
+# ---------------------------------------------------------------- Figure C1: one tuple
 TUPLE_ANSWERS = [9, 9, 4, 10]  # Qwen3-8B, Erdős triangles-0000, direct: reference and three relabelings
 TRUE_ANSWER = 9
 # A schematic graph (two triangles sharing a node), drawn identically in every panel; only the labels move.
@@ -149,7 +149,7 @@ def fig_tuple():
     save(fig, "fig1_tuple")
 
 
-# ---------------------------------------------------------------- Figures 2 and 3: M1 vs M2, pooled
+# ---------------------------------------------------------------- Figures 1 and B1: M1 vs M2, pooled
 POOLED = {ds: {md: tuple(FIG_CI[f"{DS_KEY[ds]}|all|{md}"]["flip"] + FIG_CI[f"{DS_KEY[ds]}|all|{md}"]["weighted"])
               for md in ("M1", "M2")} for ds in ("GraphQA", "Erdős")}  # (flip, lo, hi, weighted, lo, hi)
 MODE_LABEL = {"M1": "M1 direct", "M2": "M2 code from text"}
@@ -179,7 +179,7 @@ def fig_pooled(k, name, ylabel, ymax, pct):
     save(fig, name)
 
 
-# ---------------------------------------------------------------- Figure 4: flip rate by graph size
+# ---------------------------------------------------------------- Figure 2: flip rate by graph size
 SIZE = ["up to 10", "11 to 20", "21 to 40", "over 40"]  # bins of scripts/paper_metrics.py
 SIZE_TICKS = ["≤10", "11–20", "21–40", ">40"]
 ARM_KEY = {"Direct (M1)": "direct", "Code, plain Python (M2)": "code/native", "Code, NetworkX (M2)": "code/networkx"}
@@ -207,7 +207,7 @@ def fig_size():
     save(fig, "fig4_graph_size")
 
 
-# ---------------------------------------------------------------- Figure 5: where plain-Python flips start
+# ---------------------------------------------------------------- Figure B4: where plain-Python flips start
 LOC_B = METRICS["localization_b"]  # dataset|arm|factor -> {flips, program, crash, copy}
 START = {  # condition: (program, crash, copy), % of flipped plain-Python tuples
     f"{ds} {factor}": tuple(LOC_B[f"{DS_KEY[ds]}|code/native|{factor}"][k] for k in ("program", "crash", "copy"))
@@ -228,7 +228,7 @@ def fig_start():
     save(fig, "fig5_where_flips_start")
 
 
-# ---------------------------------------------------------------- Figure 6: flips that take the other reading
+# ---------------------------------------------------------------- Figure B5: flips that take the other reading
 OTHER = METRICS["other_reading_code_flips_all_answered"]  # dataset|task|model -> counts of flipped code tuples
 # in which every serialization is answered, as Section 5.3 counts them
 
@@ -263,7 +263,7 @@ def fig_reading():
     save(fig, "fig6_other_reading")
 
 
-# ---------------------------------------------------------------- Figures B1 and B2: per model
+# ---------------------------------------------------------------- Figures B2 and B3: per model
 MODELS = ["Qwen3-8B", "Gemma 4 31B", "DeepSeek-V4-Flash", "DeepSeek-V3.1"]
 MODEL_MARKER = {"Qwen3-8B": "o", "Gemma 4 31B": "^", "DeepSeek-V4-Flash": "s", "DeepSeek-V3.1": "D"}
 PER_MODEL = {(ds, m, md): tuple(FIG_CI[f"{DS_KEY[ds]}|{MODEL_KEY[m]}|{md}"]["flip"]

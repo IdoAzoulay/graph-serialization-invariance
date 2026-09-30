@@ -572,6 +572,32 @@
    "all_different_pct_of_4member_flips": 4.1
   }
  },
+ "networkx_syntax_crash_flips": {
+  "graphqa": {
+   "tuples": 2800,
+   "flips": 381,
+   "crash_flips": 195,
+   "crash_flips_by_model": {
+    "hf-qwen3-8b-nscale": 194,
+    "hf-deepseek-v4-flash": 1
+   },
+   "crash_share_of_flips_pct": 51.2,
+   "flip_rate_pct": 13.6,
+   "flip_rate_without_crashes_pct": 6.6
+  },
+  "erdos": {
+   "tuples": 4800,
+   "flips": 795,
+   "crash_flips": 567,
+   "crash_flips_by_model": {
+    "hf-qwen3-8b-nscale": 220,
+    "hf-deepseek-v4-flash": 347
+   },
+   "crash_share_of_flips_pct": 71.3,
+   "flip_rate_pct": 16.6,
+   "flip_rate_without_crashes_pct": 4.8
+  }
+ },
  "flip_rate_per_model_relabel+order": {
   "erdos|code/native|hf-deepseek-v3.1-novita": 1.7,
   "erdos|code/native|hf-deepseek-v4-flash": 3.5,
@@ -793,14 +819,14 @@
    "shares_among_failures": {
     "copy": 9.6,
     "solve": 78.6,
-    "run": 11.2,
-    "other": 0.6
+    "run": 11.8,
+    "other": 0.0
    },
    "counts": {
     "copy": 63,
     "solve": 513,
-    "run": 73,
-    "other": 4
+    "run": 77,
+    "other": 0
    }
   },
   "erdos|native|structure": {
@@ -810,14 +836,14 @@
    "shares_among_failures": {
     "copy": 11.2,
     "solve": 80.6,
-    "run": 3.2,
-    "other": 5.0
+    "run": 8.2,
+    "other": 0.0
    },
    "counts": {
     "copy": 88,
     "solve": 631,
-    "run": 25,
-    "other": 39
+    "run": 64,
+    "other": 0
    }
   },
   "erdos|native|syntax": {
@@ -844,14 +870,14 @@
    "shares_among_failures": {
     "copy": 0.6,
     "solve": 8.5,
-    "run": 90.0,
-    "other": 0.9
+    "run": 90.9,
+    "other": 0.0
    },
    "counts": {
     "copy": 2,
     "solve": 29,
-    "run": 306,
-    "other": 3
+    "run": 309,
+    "other": 0
    }
   },
   "erdos|networkx|relabel+order": {
@@ -861,14 +887,14 @@
    "shares_among_failures": {
     "copy": 2.1,
     "solve": 8.6,
-    "run": 87.8,
-    "other": 1.5
+    "run": 89.3,
+    "other": 0.0
    },
    "counts": {
     "copy": 52,
     "solve": 211,
-    "run": 2155,
-    "other": 37
+    "run": 2192,
+    "other": 0
    }
   },
   "erdos|networkx|structure": {
@@ -878,14 +904,14 @@
    "shares_among_failures": {
     "copy": 13.1,
     "solve": 23.9,
-    "run": 59.3,
-    "other": 3.7
+    "run": 63.0,
+    "other": 0.0
    },
    "counts": {
     "copy": 134,
     "solve": 244,
-    "run": 607,
-    "other": 38
+    "run": 645,
+    "other": 0
    }
   },
   "erdos|networkx|syntax": {
@@ -895,14 +921,14 @@
    "shares_among_failures": {
     "copy": 0.5,
     "solve": 2.0,
-    "run": 97.4,
-    "other": 0.1
+    "run": 97.5,
+    "other": 0.0
    },
    "counts": {
     "copy": 6,
     "solve": 26,
-    "run": 1243,
-    "other": 1
+    "run": 1244,
+    "other": 0
    }
   },
   "graphqa|native|reference": {
@@ -930,13 +956,13 @@
     "copy": 1.4,
     "solve": 98.5,
     "run": 0.1,
-    "other": 0.1
+    "other": 0.0
    },
    "counts": {
     "copy": 27,
     "solve": 1944,
-    "run": 1,
-    "other": 1
+    "run": 2,
+    "other": 0
    }
   },
   "graphqa|native|structure": {
@@ -963,14 +989,14 @@
    "shares_among_failures": {
     "copy": 0.1,
     "solve": 99.0,
-    "run": 0.6,
-    "other": 0.2
+    "run": 0.8,
+    "other": 0.0
    },
    "counts": {
     "copy": 1,
     "solve": 816,
-    "run": 5,
-    "other": 2
+    "run": 7,
+    "other": 0
    }
   },
   "graphqa|networkx|reference": {
@@ -980,14 +1006,14 @@
    "shares_among_failures": {
     "copy": 1.6,
     "solve": 93.1,
-    "run": 2.3,
-    "other": 3.0
+    "run": 5.3,
+    "other": 0.0
    },
    "counts": {
     "copy": 5,
     "solve": 283,
-    "run": 7,
-    "other": 9
+    "run": 16,
+    "other": 0
    }
   },
   "graphqa|networkx|relabel+order": {
@@ -997,14 +1023,14 @@
    "shares_among_failures": {
     "copy": 1.7,
     "solve": 93.4,
-    "run": 2.9,
-    "other": 2.0
+    "run": 4.9,
+    "other": 0.0
    },
    "counts": {
     "copy": 35,
     "solve": 1965,
-    "run": 62,
-    "other": 42
+    "run": 104,
+    "other": 0
    }
   },
   "graphqa|networkx|structure": {
@@ -1014,14 +1040,14 @@
    "shares_among_failures": {
     "copy": 3.0,
     "solve": 89.8,
-    "run": 6.1,
-    "other": 1.1
+    "run": 7.2,
+    "other": 0.0
    },
    "counts": {
     "copy": 17,
     "solve": 512,
-    "run": 35,
-    "other": 6
+    "run": 41,
+    "other": 0
    }
   },
   "graphqa|networkx|syntax": {
@@ -1031,14 +1057,14 @@
    "shares_among_failures": {
     "copy": 0.1,
     "solve": 73.0,
-    "run": 24.7,
-    "other": 2.3
+    "run": 26.9,
+    "other": 0.0
    },
    "counts": {
     "copy": 1,
     "solve": 740,
-    "run": 250,
-    "other": 23
+    "run": 273,
+    "other": 0
    }
   }
  },

@@ -1,7 +1,7 @@
 """Ablation: what does a model assume when the serialization omits the graph type?
 
 For an undirected graph the Erdos graph-as-code (M3) prompt stated the graph type only if the task
-preamble did (paper, Section 5.5 and Appendix E). The rerun that states it for
+preamble did (paper, Section 5.4 and Appendix D). The rerun that states it for
 every undirected graph (`configs/erdos_m3fix.yaml`) turns that defect into a controlled
 one-sentence ablation: the same model, task, graph and template, with one fact present or absent.
 
@@ -121,7 +121,7 @@ def task_sensitivity() -> pd.DataFrame:
         rows.append(t)
     out = pd.concat(rows, ignore_index=True)
     # An accuracy change does not say why it happened: single-program flips and re-asked prompts
-    # move tasks too (paper, Section 5.5). Flag the size only.
+    # move tasks too (paper, Section 5.4). Flag the size only.
     out["accuracy_gain_gt_5pp"] = out["delta"] > 0.05
     cols = ["model", "library", "task", "base_source", "n_undirected", "acc_omitted", "acc_stated",
             "delta", "acc_omitted_undirected", "acc_stated_undirected", "delta_undirected", "accuracy_gain_gt_5pp"]

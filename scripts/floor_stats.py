@@ -8,7 +8,7 @@ Reads the per-instance rows `nondeterminism_floor.py --per-instance` writes
 rule, results/review/floor/floor_stats_<rule>_cells.csv (one row per dataset x model x arm x axis),
 floor_stats_<rule>_pooled.csv (per model: all cells, per dataset, per arm) and
 floor_stats_<rule>_modes.csv (per dataset x arm, for each model and for the four models together).
-The paper quotes the flip rule's cells (Section 5.1 and Appendix D: how far Qwen3-8B's code exceeds its
+The paper quotes the flip rule's cells (Section 5.1 and Appendix C: how far Qwen3-8B's code exceeds its
 floor, and in how many cells the other models' code does).
 
 Rules. When do k answers "agree"?
@@ -320,21 +320,27 @@ def check_against_json(cells: pd.DataFrame) -> None:
     for ds in DATASETS:
         report = json.loads((FLOOR / ds / "noise_floor.json").read_text())["report"]
         for model, arms in report.items():
+            # a cell's instances can come from both references: an Erdos relabel cell holds the instances with a
+            # separate sorted-identity reference and those whose identity relabeling reads like canonical
+            parts: dict = {}
             for arm_ref, r in arms.items():
-                arm = arm_ref.split("|")[0]
                 for axis in ("relabel", "order"):
-                    o = r.get(f"obs_{axis}")
-                    if not o:
-                        continue
-                    row = cells[(cells.dataset == ds) & (cells.model == model) & (cells.arm == arm)
-                                & (cells.axis == axis)].iloc[0]
-                    assert row.n == o["n"] and math.isclose(row.flip, o["flip_rate"]), (ds, model, arm, axis)
-                    assert math.isclose(row.excess, o["excess_over_floor"], abs_tol=1e-12)
+                    if r.get(f"obs_{axis}"):
+                        parts.setdefault((arm_ref.split("|")[0], axis), []).append((r, r[f"obs_{axis}"]))
+            for (arm, axis), got in parts.items():
+                row = cells[(cells.dataset == ds) & (cells.model == model) & (cells.arm == arm)
+                            & (cells.axis == axis)].iloc[0]
+                n = sum(o["n"] for _, o in got)
+                assert row.n == n, (ds, model, arm, axis)
+                assert math.isclose(row.flip, sum(o["n"] * o["flip_rate"] for _, o in got) / n), (ds, model, arm, axis)
+                assert math.isclose(row.excess, sum(o["n"] * o["excess_over_floor"] for _, o in got) / n, abs_tol=1e-12)
+                if len(got) == 1:  # one reference: its Wald interval and floor are the cell's
+                    r, o = got[0]
                     assert math.isclose(row.wald_lo, o["ci95"][0], abs_tol=1e-9)
                     assert math.isclose(row.wald_hi, o["ci95"][1], abs_tol=1e-9)
                     if o["n"] == r["n"]:  # the cell covers every instance the floor was measured on
                         assert math.isclose(row["floor"], r["floor"]), (ds, model, arm, axis)
-                    checked += 1
+                checked += 1
     assert checked == len(cells), (checked, len(cells))
     print(f"literal rule: all {checked} cells reproduce noise_floor.json")
 
