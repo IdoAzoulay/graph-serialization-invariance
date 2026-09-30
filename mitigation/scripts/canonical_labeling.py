@@ -126,7 +126,7 @@ def canonical_variant(canon: Variant, scheme: str, query_args: dict | None = Non
     _sort_in_place(node_seq, edge_seq)
     v = _derive(canon, "relabel", f"canon_{scheme}", params={"seed": f"canon_{scheme}", "ordering": "sorted_st"},
                 label_map=label_map, node_seq=node_seq, edge_seq=edge_seq)
-    v.text = render(v)
+    v.text = render(v, prompt_fixes=bool(canon.params.get("prompt_fixes")))
     return v
 
 

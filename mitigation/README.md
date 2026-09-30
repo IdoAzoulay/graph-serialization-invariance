@@ -1,6 +1,6 @@
 # Mitigation experiments (separable)
 
-This folder holds the experiments built on top of the main measurement: the repeat-noise floor, disagreement across serializations used as an error detector, voting, two ways to remove the serialization from the prompt, and two prompt hints. They live apart from the main pipeline so that they can be dropped as one unit. `scripts/reproduce.sh` does not run them, and nothing outside this folder imports from it.
+This folder holds the experiments built on top of the main measurement: the repeat-noise floor, disagreement across serializations used as an error detector, voting, two ways to remove the serialization from the prompt, and two prompt hints. They live apart from the main pipeline so that they can be dropped as one unit. `scripts/reproduce.sh` runs only their offline parts (the detector and voting, and the repeat-floor statistics), and skips them when the folder is gone; nothing outside this folder imports from it.
 
 | Id | Script | Committed result | What it measures | Needs |
 |---|---|---|---|---|
@@ -84,6 +84,6 @@ The committed tables of E0 (`noise_floor.json` and the per-instance rows), E3, E
 
 ## Removing the mitigation experiments
 
-1. `rm -rf mitigation/`. Nothing else in the repository imports from it, and the main tests and `scripts/reproduce.sh` do not use it.
+1. `rm -rf mitigation/`. Nothing else in the repository imports from it, the main tests do not use it, and `scripts/reproduce.sh` skips its mitigation step when the folder is missing.
 2. Optional: `src/gsi/serial/canonical.py` and `tests/test_canonical.py` are used only by E3 and can go too.
 3. Remove the paper text that cites these results (the table above), and the "mitigation/" line in the top-level README.

@@ -1,6 +1,6 @@
 """Draw the paper's figures as vector PDFs next to this file.
 
-The numbers are the ones printed in the paper. Figures 2-6, B1 and B2 read them from
+Every figure but the one-tuple example (fig1_tuple, whose answers are typed in) reads its numbers from
 results/review/paper_metrics.json (scripts/paper_metrics.py), including every 95% interval:
 graphs resampled with replacement 2,000 times, a graph's tuples kept together.
 

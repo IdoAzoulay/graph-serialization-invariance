@@ -586,6 +586,8 @@ out["graphqa_task_groups_relabel+order"] = groups
 # ---------------------------------------------------------------- distinct prompts
 # A repeated prompt is sent once per model and its reply reused: model_calls = distinct (model, prompt) pairs.
 # In M3 a call is a program, and one program can answer many graphs.
+# The Erdős rerun's count includes the directed graphs' prompts, which did not change and were answered from
+# the first run's cache (150 per model).
 dp = {}
 for run, (a, _) in RUNS.items():
     m3 = a[a["mode"] == "graph_as_code"]

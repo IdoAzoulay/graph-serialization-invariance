@@ -28,8 +28,8 @@ class ExperimentConfig:
     paths: dict = field(default_factory=dict)
     inject_graph_type: bool = False   # state "undirected" explicitly in M3 prompts (see prompts.modes)
     # Fix the two defects of the published prompts: relabelings write undirected edges smaller label first,
-    # and an edgeless GraphQA edge list reads "(none)". Changes 19,347 published prompts per model, so it is
-    # off by default (README, "Known issues in the published prompts").
+    # and an edgeless GraphQA edge list reads "(none)". Changes the prompts of 19,347 published records per model
+    # (19,068 distinct prompts), so it is off by default (README, "Known issues in the published prompts").
     prompt_fixes: bool = False
 
     @property

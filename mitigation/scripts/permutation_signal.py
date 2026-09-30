@@ -19,7 +19,10 @@ Rules. When do the answers of an instance disagree (and the instance get flagged
   * flip -- the paper's flip rule (Section 4.2; scripts/paper_metrics.py): unless all answers are the
     same, where every correct answer (the scored record's `correct`) counts as the same answer and
     every missing answer counts as one shared value. It uses the true answer, so it is not a
-    deployable detector; it counts a flag only where the paper counts a flip. It can only remove
+    deployable detector. It applies the paper's same-answer rule to the canonical answer and the
+    probes: on GraphQA its flags are exactly the paper's flips, while on Erdos the relabel probe
+    compares with the canonical answer, not the sorted identity of the paper's tuples, so about
+    1% of flags and flips differ (116 and 113 of 14,400). It can only remove
     flags, and only on instances whose canonical answer is correct or missing: the flags on
     answered errors (`caught_answered`, `recall_answered`) are the same under both rules. The
     majority vote (`vote_acc`, `vote_delta`) compares answer keys under both rules.

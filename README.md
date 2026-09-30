@@ -89,7 +89,7 @@ The published records were produced by this pipeline before the fixes listed in 
 
 ## Known issues in the published prompts
 
-Two defects remain in the prompts that every published record answers. They are documented, not fixed in the data: fixing them changes 19,347 prompts per model (18,996 new prompts to ask, about 76,000 calls for the four models) and reruns 21,552 Graph-as-Code programs per model on re-oriented edges. That rerun has not been done.
+Two defects remain in the prompts that every published record answers. They are documented, not fixed in the data: fixing them changes the prompts of 19,347 records per model (19,068 distinct prompts, 18,996 of them never asked: about 76,000 calls for the four models) and re-executes 21,552 Graph-as-Code programs per model, over both Erdős runs, on re-oriented edges. That rerun has not been done.
 
 - **A relabeling also reorients edges.** It renames both ends of every edge and re-sorts the list, but does not write an undirected edge smaller label first, as Herbst et al.'s relabeled example does. About half of a relabeling's edges come out larger label first (50.4% on GraphQA, 50.2% on Erdős), against 0% of the GraphQA reference edges and 25.7% of the Erdős ones. Each relabeling flips the written orientation of 50% of its reference's edges on average (5-95%: 20-80% on GraphQA, 27-73% on Erdős), so the relabel factor changes the labels and the orientation together.
 - **The edgeless graph has an empty edge list.** graphqa-er-0025 has no edges, and its GraphQA edge lists read "The edges in G are: ." (42 serializations of its 7 instances; the graph has 1,400 answers).
