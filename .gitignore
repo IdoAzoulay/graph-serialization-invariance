@@ -4,7 +4,6 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .env
-data/raw/
 # instances.jsonl is tracked: it pins which graphs/tasks were sampled, so an
 # upstream change to the HuggingFace Erdos dataset cannot silently alter results.
 # variants.jsonl is derived from it deterministically, so it is regenerated.

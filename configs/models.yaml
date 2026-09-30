@@ -1,7 +1,6 @@
 # The four models of the published run, and the offline stub. One OpenAI-compatible client covers every
 # provider; keys come from the environment (see .env.example). All four go through the Hugging Face
 # Inference Providers router (one HF_TOKEN), and a ":provider" suffix on the model id pins the provider.
-# Entries no published run used are in tmp/configs/models_unused.yaml.
 
 stub:
   provider: stub

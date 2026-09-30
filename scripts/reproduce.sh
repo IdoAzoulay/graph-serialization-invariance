@@ -17,7 +17,7 @@ elif [ -x .venv/Scripts/python ]; then PY=.venv/Scripts/python
 else PY=$(command -v python3 || command -v python)
 fi
 # No key reaches any client, and the dataset is downloaded anonymously (not with a stored login).
-export DEEPSEEK_API_KEY= OPENROUTER_API_KEY= HF_TOKEN= HF_HUB_DISABLE_IMPLICIT_TOKEN=1 MPLBACKEND=Agg
+export HF_TOKEN= HF_HUB_DISABLE_IMPLICIT_TOKEN=1 MPLBACKEND=Agg
 MODELS=(hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b hf-deepseek-v4-flash)
 step() { echo "=== $(date '+%T') $*"; }
 

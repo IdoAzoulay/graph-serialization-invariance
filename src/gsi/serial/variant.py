@@ -48,10 +48,6 @@ class Variant:
     def inverse_label_map(self) -> dict[int, int]:
         return {v: k for k, v in self.label_map.items()}
 
-    @property
-    def is_reference(self) -> bool:
-        return self.axis == "canonical" or self.params.get("seed") == IDENTITY
-
 
 def _rng(*parts: Any) -> random.Random:
     key = "|".join(str(p) for p in parts)

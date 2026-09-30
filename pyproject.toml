@@ -14,7 +14,6 @@ dependencies = [
 
 [project.optional-dependencies]
 erdos = ["datasets>=2.19"]                                   # rebuilding the Erdős instances
-stats = ["scipy>=1.11", "statsmodels>=0.14"]                 # scripts/paper_metrics.py
 reproduce = ["huggingface_hub>=0.24", "pyarrow>=14", "scipy>=1.11", "statsmodels>=0.14"]  # scripts/reproduce.sh
 dev = ["pytest>=8"]
 

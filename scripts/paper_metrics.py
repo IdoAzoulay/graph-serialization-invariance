@@ -505,7 +505,7 @@ out["mcnemar_m2_vs_m3_by_axis_summary"] = mc_axis_sum
 # ---------------------------------------------------------------- performance of every mode (Tables 3 and E1)
 # accuracy: every serialization the mode answered; like_for_like_accuracy: the reference, relabelings and edge
 # orders only (tuples.like_for_like), the serializations every mode is compared on; robust_accuracy and flip_rate:
-# relabel+order tuples. Table 3 takes Erdős M3 from erdos_rerun, Table E1 from erdos.
+# relabel+order tuples. Table 3 takes Erdős M3 from erdos_rerun, Table D1 from erdos.
 def mode_summary(a, t):
     lfl, ro = a[a.axis.map(like_for_like)], t[t.axis.isin(PERM)]
     return dict(answers=int(len(a)), accuracy=round(100 * a.correct.mean(), 1), like_for_like_answers=int(len(lfl)),
@@ -543,7 +543,7 @@ out["dagger_cells"] = [dict(dataset=ds, factor=fac, model=model, arm=arm, code_f
                        for (ds, fac, model, arm), v in fr.items()
                        if arm != "direct" and v - fr[(ds, fac, model, "direct")] >= 1]
 
-# ---------------------------------------------------------------- tuple sizes (Table D1)
+# ---------------------------------------------------------------- tuple sizes (Table C1)
 # Answers per tuple follow from the serializations alone, so every model and mode has the same sizes.
 sizes = {}
 for (ds, ax), d in M12.groupby(["dataset", "axis"]):
