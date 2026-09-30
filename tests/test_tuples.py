@@ -1,7 +1,8 @@
 """The per-tuple rules behind the paper's metrics (gsi.analysis.tuples)."""
 from itertools import permutations
 
-from gsi.analysis.tuples import divergence_site, failure_step, reading_tag, spread
+from gsi.analysis.tuples import (comparison_value, divergence_site, failure_step, reading_tag, spread,
+                                 tuple_factors, tuple_members, tuple_reference)
 
 
 def test_divergence_site_does_not_depend_on_serialization_order():
@@ -44,3 +45,23 @@ def test_reading_tag():
     assert reading_tag("disconnected_nodes", [{4}, {5}], {4}, {4}) == "readings coincide"
     assert reading_tag("neighbor", [{1}, {1, 2}], {1, 2}, None) == "strict subset of true neighbours"
     assert reading_tag("neighbor", [{1, 2}, {1, 2, 3}], {1, 2}, None) == "other"
+
+
+def _answer(axis, vid, identity=False):
+    return {"axis": axis, "variant_id": vid, "is_identity": identity}
+
+
+def test_tuple_members_follow_the_paper():
+    canon, ident = _answer("canonical", "c"), _answer("relabel", "r:identity", True)
+    s0, o0 = _answer("relabel", "r:s0"), _answer("order", "o:0")
+    answers = [canon, ident, s0, o0]
+    assert tuple_members(answers, "relabel") == [ident, s0]  # compared with the sorted identity, not canonical
+    assert tuple_members(answers, "order") == [canon, o0]
+    assert tuple_members([canon, s0], "relabel") == [canon, s0]  # no identity reference: canonical
+    assert tuple_members(answers, "syntax") is None  # canonical alone is no tuple
+    assert tuple_reference([ident, s0]) is ident and tuple_reference([canon, s0]) is canon
+    assert tuple_reference([canon, o0]) is canon
+    assert tuple_factors("graph_as_code/native") == ("relabel", "order")
+    assert tuple_factors("code/native") == ("relabel", "order", "structure", "syntax")
+    assert [comparison_value(*a) for a in [(True, True, "3"), (False, True, "3"), (False, False, "null")]] == \
+        ["CORRECT", "3", "NA"]
