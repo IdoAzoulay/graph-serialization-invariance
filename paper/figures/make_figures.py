@@ -229,7 +229,8 @@ def fig_start():
 
 
 # ---------------------------------------------------------------- Figure 6: flips that take the other reading
-OTHER = METRICS["other_reading_code_flips"]  # dataset|task|model -> counts of flipped code tuples
+OTHER = METRICS["other_reading_code_flips_all_answered"]  # dataset|task|model -> counts of flipped code tuples
+# in which every serialization is answered, as Section 5.3 counts them
 
 
 def reading_share(key):
