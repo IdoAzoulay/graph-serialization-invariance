@@ -4,8 +4,8 @@ from itertools import permutations
 
 import pytest
 
-from gsi.analysis.tuples import (divergence_site, durkalski, failure_step, is_double, like_for_like, reading_tag,
-                                 spread)
+from gsi.analysis.tuples import (crash_only_flip, divergence_site, durkalski, failure_step, is_double, like_for_like,
+                                 reading_tag, spread)
 
 
 def test_divergence_site_does_not_depend_on_serialization_order():
@@ -29,7 +29,9 @@ def test_failure_step_assigns_the_first_step_that_failed():
     assert failure_step("transcription", False, False) == "copy"
     assert failure_step("logic", True, False) == "solve"
     assert failure_step("construction", True, False) == "solve"
-    assert failure_step("format", True, False) == "other"
+    assert failure_step("format", True, False) == "run"  # no program, or no parseable ans: no answer
+    assert failure_step("format", None, False) == "run"
+    assert failure_step("unverifiable", None, False) == "other"
     assert failure_step("no_computation", True, True) is None  # a correct answer is not a failure
     assert failure_step("ok", False, True) is None
 
@@ -84,3 +86,11 @@ def test_durkalski_p_is_the_chi_square_tail():
         x, p = durkalski(b, c)
         assert p == pytest.approx(stats.chi2.sf(x, 1))
 
+
+def test_crash_only_flip():
+    ids = ["i::canonical", "i::syntax:plain", "i::syntax:json", "i::syntax:networkx_code"]
+    nx = "::syntax:networkx_code"
+    assert crash_only_flip(["3", "3", "3", "NA"], ids, nx)
+    assert not crash_only_flip(["3", "NA", "3", "NA"], ids, nx)  # another serialization gave no answer too
+    assert not crash_only_flip(["3", "4", "3", "5"], ids, nx)    # the NetworkX-code serialization answered
+    assert not crash_only_flip(["3", "3"], ids[:2], nx)           # no NetworkX-code serialization in the tuple

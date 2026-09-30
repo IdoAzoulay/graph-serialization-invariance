@@ -32,13 +32,15 @@ def divergence_site(vals: list, bad_copy: list[bool], all_answered: bool) -> str
 def failure_step(failure_class: str, declared_ok, correct: bool) -> str | None:
     """The first step that failed for a code answer, along copy -> solve -> run; None if it is correct.
 
-    A program that declared a wrong graph failed at the copy even if it then crashed.
+    A program that declared a wrong graph failed at the copy even if it then crashed. "run" is every answer that
+    gives no answer (the paper's crash): the program crashed or timed out ("execution"), or there was no program or
+    no parseable `ans` ("format"), as localization (b) and the flip rule count it.
     """
     if correct:
         return None
     if declared_ok is False or failure_class == "transcription":
         return "copy"
-    return {"execution": "run", "logic": "solve", "construction": "solve"}.get(failure_class, "other")
+    return {"execution": "run", "format": "run", "logic": "solve", "construction": "solve"}.get(failure_class, "other")
 
 
 def spread(values: list[float], truth: float | None) -> tuple[float | None, bool | None]:
@@ -96,3 +98,10 @@ def durkalski(b: list[int], c: list[int]) -> tuple[float, float]:
         return 0.0, 1.0
     x = sum(d) ** 2 / den
     return x, math.erfc(math.sqrt(x / 2))  # upper tail of chi-square(1)
+
+
+def crash_only_flip(keys: list[str], variant_ids: list[str], suffix: str) -> bool:
+    """Whether a flipped tuple flips only because one serialization (the variant whose id ends in `suffix`) gave no
+    answer ("NA") while every other one answered. Section 5.2 counts NetworkX code's syntax flips this way."""
+    target = [k for k, v in zip(keys, variant_ids) if v.endswith(suffix)]
+    return target == ["NA"] and keys.count("NA") == 1
