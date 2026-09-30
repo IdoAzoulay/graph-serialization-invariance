@@ -72,42 +72,6 @@ def test_changed_prompts_are_asked_again(tmp_path):
     assert set(execs[-len(changed):]) == changed and len(execs) == len(set(execs))
 
 
-def test_prompt_fixes_reask_only_the_relabelings_and_are_not_mixed_up(tmp_path):
-    cfg = write_config(tmp_path)
-    main(["--config", str(cfg)])
-    responses = tmp_path / "results" / "pipe" / "responses" / "stub.jsonl"
-    before = {r["record_id"]: r["prompt_hash"] for r in read_jsonl(responses)}
-    fixed = write_config(tmp_path, prompt_fixes=True).rename(tmp_path / "fixed.yaml")  # same name, same dirs
-    cfg = write_config(tmp_path)
-    assert load_config(fixed).prompt_fixes and not load_config(cfg).prompt_fixes
-    with pytest.raises(SystemExit, match="prompt_fixes"):  # variants.jsonl still holds the published variants
-        main(["--config", str(fixed), "--stages", "llm"])
-    main(["--config", str(fixed), "--stages", "variants,llm,exec,score"])
-    after = {r["record_id"]: r["prompt_hash"] for r in read_jsonl(responses)}
-    changed = {k for k in after if after[k] != before[k]}
-    # the relabelings' graph text changes; M3 prompts carry no graph text
-    assert after.keys() == before.keys() and changed
-    assert all("::relabel:s" in k and "::direct::" in k for k in changed)
-    scored = list(read_jsonl(tmp_path / "results" / "pipe" / "scored" / "stub.jsonl"))
-    assert all(r["params"]["prompt_fixes"] for r in scored)
-    with pytest.raises(SystemExit, match="prompt_fixes"):
-        main(["--config", str(cfg), "--stages", "score"])
-
-
-def test_score_stage_skips_replies_to_other_variants(tmp_path):
-    fixed = write_config(tmp_path, prompt_fixes=True)
-    main(["--config", str(fixed)])
-    scored = tmp_path / "results" / "pipe" / "scored" / "stub.jsonl"
-    n_fixed = len(list(read_jsonl(scored)))
-    # rebuilt with the published prompts, but the llm and exec stages not rerun: the relabelings' replies and
-    # their Graph-as-Code executions belong to the fixed variants and must not be scored against the published ones
-    main(["--config", str(write_config(tmp_path)), "--stages", "variants,score"])
-    rows = list(read_jsonl(scored))
-    assert 0 < len(rows) < n_fixed
-    assert not any("::relabel:s" in r["record_id"] and r["mode"] == "direct" for r in rows)
-    assert not any(r["params"].get("prompt_fixes") for r in rows)
-
-
 def test_a_changed_graph_is_executed_again_under_the_same_prompt(tmp_path):
     cfg = write_config(tmp_path)
     main(["--config", str(cfg)])

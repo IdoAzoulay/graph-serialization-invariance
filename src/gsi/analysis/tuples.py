@@ -13,40 +13,6 @@ READING_TASKS = ("connected_nodes", "disconnected_nodes", "neighbor")
 # M3 never sees the graph text, so its structure and syntax answers repeat its reference answer; accuracy over
 # these three axes scores every mode on the serializations that can change what it computes
 LIKE_FOR_LIKE = ("canonical", "relabel", "order")
-FACTORS = ("relabel", "order", "structure", "syntax")
-
-
-def tuple_factors(arm: str) -> tuple[str, ...]:
-    """The factors an arm has tuples for. A Graph-as-Code prompt carries no graph text, so structure and syntax
-    never reach it: only relabel (its question can name a node) and order (the injected lists) do."""
-    return ("relabel", "order") if arm.startswith("graph_as_code") else FACTORS
-
-
-def tuple_members(answers: list[dict], axis: str) -> list[dict] | None:
-    """One factor's tuple among one model's answers to one instance in one arm, each a dict with "axis",
-    "variant_id" and "is_identity" (the sorted identity reference of the relabel axis).
-
-    Relabel: the relabel answers, which hold the sorted identity reference, or canonical + the relabelings when
-    there is no such reference; other factors: canonical + the factor's variants. None when fewer than two
-    serializations. The reference is the member with "is_identity" (relabel) or axis "canonical".
-    """
-    var = [a for a in answers if a["axis"] == axis]
-    if not (axis == "relabel" and any(a["is_identity"] for a in var)):
-        var = [a for a in answers if a["axis"] == "canonical"] + var
-    return var if len({a["variant_id"] for a in var}) >= 2 else None
-
-
-def tuple_reference(members: list[dict]) -> dict:
-    """The reference of a tuple from tuple_members: the sorted identity when it is a member, else canonical."""
-    refs = [a for a in members if a["is_identity"]] or [a for a in members if a["axis"] == "canonical"]
-    assert len(refs) == 1, [a["variant_id"] for a in members]
-    return refs[0]
-
-
-def comparison_value(correct: bool, answered: bool, answer_key: str) -> str:
-    """A serialization's value in its tuple: "CORRECT", the answer key of a wrong answer, or "NA" (no answer).
-    A tuple flips when its values are not all equal."""
-    return "CORRECT" if correct else (answer_key if answered else "NA")
 
 
 def divergence_site(vals: list, bad_copy: list[bool], all_answered: bool) -> str:

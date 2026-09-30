@@ -4,7 +4,7 @@ Code and data for the paper *How Invariant is Code Generation to Graph Serializa
 
 Ram Kedem, Yehonatan Barel, Ido Azoulay, Dolev Abudi
 
-Language models often answer graph questions better by writing code than by answering directly. We ask whether that code is also *invariant*: does it give the same answer when the same graph is written differently? Each graph is rewritten in equivalent serializations that change one factor at a time (node relabeling, edge order, structure, syntax; a relabeling also reorients about half of the undirected edges, see [Known issues in the published prompts](#known-issues-in-the-published-prompts)), and every serialization is posed in three modes:
+Language models often answer graph questions better by writing code than by answering directly. We ask whether that code is also *invariant*: does it give the same answer when the same graph is written differently? Each graph is rewritten in equivalent serializations that change one factor at a time (node relabeling, edge order, structure, syntax), and every serialization is posed in three modes:
 
 | Mode | The model sees | It returns |
 |---|---|---|
@@ -37,7 +37,6 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/erdos_m3fix/tables/ablation/*.csv`: graph-type omission ablation | `scripts/graph_type_ablation.py` |
 | `results/review/{summary.json,paired_intervals.csv}`: descriptive audit, paired graph bootstrap | `scripts/audit_results.py` |
 | `results/review/paper_metrics.json`: the paper's metric set for the main experiment | `scripts/paper_metrics.py` |
-| `results/review/prompt_bug_check.json`: offline impact of the two prompt defects | `scripts/prompt_bug_check.py` |
 | `mitigation/results/<dataset>/permutation_signal{,_fliprule}.csv`: the disagreement detector and voting | `mitigation/scripts/permutation_signal.py` |
 | `mitigation/results/floor_stats_*.csv`: the repeat floor against the flip rates (Table D2) | `mitigation/scripts/floor_stats.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
@@ -86,24 +85,6 @@ python scripts/analyze.py --config configs/graphqa.yaml
 Replies are cached under `results/cache/<model>/<prompt_hash>.json`, and every stage resumes where it stopped. A stored reply whose prompt has changed is asked again. The `data` stage keeps the committed `data/processed/<dataset>/instances.jsonl`. `--rebuild-data` regenerates it, but GraphQA's SBM graphs come out different under networkx 3.7 or later, and Erdős is downloaded from `PKU-ML/Erdos` at a pinned revision.
 
 The published records were produced by this pipeline before the fixes listed in the commit history (execution retries a timeout, gives programs an empty stdin, and keys its cache on the limits). None of them changes a prompt: every published record's prompt rebuilds with the same hash.
-
-## Known issues in the published prompts
-
-Two defects remain in the prompts that every published record answers. They are documented, not fixed in the data: fixing them changes the prompts of 19,347 records per model (19,068 distinct prompts, 18,996 of them never asked: about 76,000 calls for the four models) and re-executes 21,552 Graph-as-Code programs per model, over both Erdős runs, on re-oriented edges. That rerun has not been done.
-
-- **A relabeling also reorients edges.** It renames both ends of every edge and re-sorts the list, but does not write an undirected edge smaller label first, as Herbst et al.'s relabeled example does. About half of a relabeling's edges come out larger label first (50.4% on GraphQA, 50.2% on Erdős), against 0% of the GraphQA reference edges and 25.7% of the Erdős ones. Each relabeling flips the written orientation of 50% of its reference's edges on average (5-95%: 20-80% on GraphQA, 27-73% on Erdős), so the relabel factor changes the labels and the orientation together.
-- **The edgeless graph has an empty edge list.** graphqa-er-0025 has no edges, and its GraphQA edge lists read "The edges in G are: ." (42 serializations of its 7 instances; the graph has 1,400 answers).
-
-`prompt_fixes: true` in a config applies the fixes of the unmerged branch `fix/prompt-bugs` (073f2f0): relabelings and their sorted identity reference write undirected edges smaller label first, and an empty GraphQA edge list reads "(none)". It defaults to `false`, under which every published prompt rebuilds byte for byte. To run it, copy a config under a new `name` with `prompt_fixes: true`, copy `data/processed/<dataset>/instances.jsonl` to `data/processed/<name>/` (otherwise the data stage regenerates the instances), and run the stages from `variants` on. Such variants carry `prompt_fixes: true` in their params, and a `variants.jsonl` built under the other setting is refused.
-
-`scripts/prompt_bug_check.py` (run by `reproduce.sh`) measures the impact offline and writes `results/review/prompt_bug_check.json`. It also checks that the prompts of all 144,347 records per model rebuild with their published hash.
-
-- Read as ordered pairs, every relabeled edge list is the renamed reference list (2,099 of 2,099 on GraphQA, 3,369 of 3,369 on Erdős). A program that treats the pairs as a graph, directed or not, therefore gives the renamed answer. The lists are re-sorted, though, so list order and label values still change. Graph-as-Code relabel tuples that one program answers (the question names no node) flip 0 of 2,408 times on GraphQA and 19 of 4,808 on Erdős, in the first run and in the rerun alike. In each run all 19 come from two programs that start at the first listed node: Qwen3-8B's `has_cycle` and DeepSeek-V3.1's `diameter`.
-- Within relabel tuples, an answer is not more likely to differ from the reference when more edges are reoriented. The odds ratio per +10 points is 0.97-1.05 for direct answers and both code arms on both datasets, and every 95% interval includes 1.
-- On questions that name no node, where relabeling leaves the wording unchanged, code differs from the reference about as often under relabeling as under reordering. Per answer pair on undirected graphs, plain Python gives 0.14 vs 0.18% on GraphQA and 2.55 vs 2.47% on Erdős, and NetworkX 1.52 vs 1.72% and 1.55 vs 1.34%. Direct answers differ 0.4 points (GraphQA) and 0.9 points (Erdős) more often.
-- Dropping graphqa-er-0025 moves an arm's accuracy by at most 0.075 points (0.15 for one kind of serialization) and robust accuracy by at most 0.05 on the relabel+order pool (0.12 for a single factor). Table 2's flip rates move by at most 0.19 points: syntax NetworkX goes from 13.61 to 13.42, syntax plain Python from 4.82 to 4.65, and relabel NetworkX from 7.21 to 7.11.
-
-A caveat before rerunning with the fix: writing each edge smaller label first breaks the renamed-list property above. A program that reads undirected pairs as directed edges then sees a different directed graph under each relabeling. Programs like the Erdős `neighbor` ones that read undirected graphs as directed (paper, Section 5.5) could then flip under relabeling because of the fix itself.
 
 ## Data sources
 

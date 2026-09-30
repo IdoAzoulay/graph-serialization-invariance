@@ -42,9 +42,6 @@ step "paired graph bootstrap (results/review/{summary.json,paired_intervals.csv,
 step "paper metrics (results/review/paper_metrics.json; about 2 minutes)"
 "$PY" scripts/paper_metrics.py > /dev/null
 
-step "prompt defects: offline impact check (results/review/prompt_bug_check.json)"
-"$PY" scripts/prompt_bug_check.py > /dev/null
-
 if [ -d mitigation ]; then  # the mitigation experiments can be removed as one folder (mitigation/README.md)
   step "mitigation, offline parts: detector and voting, repeat-floor statistics (mitigation/results/)"
   for cfg in graphqa erdos; do

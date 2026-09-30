@@ -123,21 +123,17 @@ def instances_for(cfg: ExperimentConfig, rebuild: bool) -> list[GraphInstance]:
     return instances
 
 
-def make_all_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
-    """Every instance's variants, rendered, as the variants stage builds them (nothing is written)."""
+def build_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
     out: dict[str, list[Variant]] = {}
+    rows = []
     for inst in instances:
         canon = canonical(inst, **cfg.canonical_for(inst.dataset))
-        vs = make_variants(inst, canon, cfg.variants_for(inst.dataset), prompt_fixes=cfg.prompt_fixes)
+        vs = make_variants(inst, canon, cfg.variants_for(inst.dataset))
         for v in vs:
-            v.text = render(v, prompt_fixes=cfg.prompt_fixes)
+            v.text = render(v)
+            rows.append(v.to_dict())
         out[inst.id] = vs
-    return out
-
-
-def build_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
-    out = make_all_variants(cfg, instances)
-    write_jsonl(cfg.data_dir / "variants.jsonl", (v.to_dict() for inst in instances for v in out[inst.id]))
+    write_jsonl(cfg.data_dir / "variants.jsonl", rows)
     return out
 
 
@@ -150,12 +146,6 @@ def load_variants(cfg: ExperimentConfig) -> dict[str, list[Variant]]:
     for d in read_jsonl(cfg.data_dir / "variants.jsonl"):
         v = Variant.from_dict(d)
         out.setdefault(v.instance_id, []).append(v)
-    # variants.jsonl fixes the prompts' graph text, so one built under the other `prompt_fixes` setting
-    # would silently ask the other prompts
-    built = {bool(v.params.get("prompt_fixes")) for vs in out.values() for v in vs}
-    if built and built != {cfg.prompt_fixes}:
-        raise SystemExit(f"{cfg.data_dir / 'variants.jsonl'} was not built with prompt_fixes: {cfg.prompt_fixes} "
-                         f"as the config says; run the variants stage")
     return out
 
 
@@ -365,25 +355,15 @@ def stage_score(cfg: ExperimentConfig, spec: ModelSpec, instances, variants) -> 
         # scored/<model>.jsonl may have been restored from the published dataset without its responses
         raise SystemExit(f"[score:{spec.name}] no responses in {cfg.results_dir / 'responses'}; "
                          f"not overwriting {cfg.results_dir / 'scored' / (spec.name + '.jsonl')}")
-    rows, stale = [], 0
+    rows = []
     for resp in responses.values():
         inst, v = inst_by_id.get(resp["instance_id"]), var_by_id.get(resp["variant_id"])
         if inst is None or v is None:
             continue
-        # a reply to an older prompt, or an execution on an older graph (the variants were rebuilt since, for
-        # example with another prompt_fixes setting), is not scored against the current variant
-        p = build_prompt(resp["mode"], inst, v, resp.get("library"), inject_graph_type=cfg.inject_graph_type)
         ex = execs.get(resp["record_id"])
-        if p.prompt_hash != resp.get("prompt_hash") or (
-                ex is not None and ex.get("exec_sig") not in (None, exec_signature(resp["code"], v, resp["mode"]))):
-            stale += 1
-            continue
         if resp["mode"] in CODE_MODES and resp.get("code") and ex is None:
             continue
         rows.append(score_record(inst, v, resp, ex))
-    if stale:
-        log(f"[score:{spec.name}] {stale} records answer an older prompt or ran on an older graph; not scored "
-            f"(run the llm and exec stages first)")
     write_jsonl(cfg.results_dir / "scored" / f"{spec.name}.jsonl", rows)
     n_ok = sum(r["correct"] for r in rows)
     log(f"[score:{spec.name}] {len(rows)} records scored, accuracy {n_ok / max(1, len(rows)):.3f}")

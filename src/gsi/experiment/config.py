@@ -27,10 +27,6 @@ class ExperimentConfig:
     exec: dict = field(default_factory=dict)
     paths: dict = field(default_factory=dict)
     inject_graph_type: bool = False   # state "undirected" explicitly in M3 prompts (see prompts.modes)
-    # Fix the two defects of the published prompts: relabelings write undirected edges smaller label first,
-    # and an edgeless GraphQA edge list reads "(none)". Changes the prompts of 19,347 published records per model
-    # (19,068 distinct prompts), so it is off by default (README, "Known issues in the published prompts").
-    prompt_fixes: bool = False
 
     @property
     def data_dir(self) -> Path:
@@ -64,7 +60,7 @@ class ExperimentConfig:
 
 
 CONFIG_KEYS = {"name", "root", "datasets", "variants", "modes", "models", "libraries", "library_tasks", "exec",
-               "paths", "inject_graph_type", "prompt_fixes"}
+               "paths", "inject_graph_type"}
 
 
 def load_config(path: str | Path) -> ExperimentConfig:
@@ -82,7 +78,6 @@ def load_config(path: str | Path) -> ExperimentConfig:
         library_tasks={k: list(v) for k, v in (raw.get("library_tasks") or {}).items()},
         exec=raw.get("exec", {}), paths=raw.get("paths", {}),
         inject_graph_type=bool(raw.get("inject_graph_type", False)),
-        prompt_fixes=bool(raw.get("prompt_fixes", False)),
     )
 
 

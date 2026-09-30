@@ -110,15 +110,13 @@ def networkx_adj_list(v: Variant) -> str:
 
 # ---------- GraphQA natural-language encoders (Fatemi et al.) ----------
 
-def graphqa_edge_list(v: Variant, empty: str = "") -> str:
-    """`empty` is what an edgeless graph's list reads. The published prompts left it blank, "The edges in
-    G are: ." (graphqa-er-0025); `render(v, prompt_fixes=True)` writes "(none)", as the other renderers do."""
+def graphqa_edge_list(v: Variant) -> str:
     if v.directed:
         head = "In a directed graph, (i,j) means that node i and node j are connected with a directed edge from i to j."
     else:
         head = "In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge."
     edges = " ".join(_edge_str(e[:2]) for e in _edges_for_render(v))
-    return f"{head} G describes a graph among nodes {_nodes_nl(v.node_seq)}.\nThe edges in G are: {edges or empty}."
+    return f"{head} G describes a graph among nodes {_nodes_nl(v.node_seq)}.\nThe edges in G are: {edges}."
 
 
 def graphqa_adj_list(v: Variant) -> str:
@@ -169,14 +167,8 @@ RENDERERS = {
 }
 
 
-# `prompt_fixes`: the renderers with the published prompts' empty GraphQA edge list fixed.
-FIXED_RENDERERS = {**RENDERERS, ("graphqa_nl", "edge_list"): lambda v: graphqa_edge_list(v, empty="(none)")}
-
-
-def render(v: Variant, prompt_fixes: bool = False) -> str:
-    """`prompt_fixes` (off in the published runs) writes an edgeless GraphQA edge list as "(none)"."""
+def render(v: Variant) -> str:
     key = (v.params["syntax"], v.params["structure"])
-    table = FIXED_RENDERERS if prompt_fixes else RENDERERS
-    if key not in table:
+    if key not in RENDERERS:
         raise ValueError(f"no renderer for syntax={key[0]} structure={key[1]}")
-    return table[key](v)
+    return RENDERERS[key](v)

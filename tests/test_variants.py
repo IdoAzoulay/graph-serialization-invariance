@@ -1,6 +1,5 @@
 import pytest
 
-from gsi.data.base import GraphInstance
 from gsi.data.graphqa import build_graphqa
 from gsi.serial.render import render
 from gsi.serial.variant import (ADJ_LIST_ORDERINGS, EDGE_LIST_ORDERINGS, IDENTITY, SYNTAXES, axes_differing,
@@ -137,71 +136,3 @@ def test_adjacency_list_round_trip_with_single_neighbour_lines():
     text = render(v)
     assert "is connected to node 0." in text  # a leaf has one neighbour
     assert parse(text, "graphqa_nl", "adj_list", False) == true_edge_set(v)
-
-
-# ---------- prompt_fixes: off reproduces the published prompts, on fixes their two defects ----------
-
-EMPTY = GraphInstance(id="e", dataset="graphqa", task="node_count", directed=False, weighted=False, nodes=[0, 1],
-                      edges=[], query_args={}, answer_type="int", ground_truth=2)
-
-
-def test_published_relabelings_write_the_renamed_edges_as_they_come():
-    """Off: a relabeled list is the renamed reference list, pair by pair, so some edges come out larger label first."""
-    larger = total = 0
-    for inst in INSTANCES:
-        ident = relabel_identity(canonical(inst, structure="edge_list", syntax="plain"))
-        for v in (relabel(ident, s) for s in range(3)):
-            lm = v.label_map  # old label -> new label (the identity reference's labels are the canonical ones)
-            assert sorted(v.edge_seq) == sorted([lm[e[0]], lm[e[1]]] for e in ident.edge_seq)
-            larger += sum(e[0] > e[1] for e in v.edge_seq)
-            total += len(v.edge_seq)
-    assert 0 < larger < total
-
-
-def test_relabeling_writes_undirected_edges_smaller_label_first():
-    for inst in INSTANCES:
-        base = canonical(inst, structure="edge_list", syntax="plain")
-        ident = relabel_identity(base, smaller_first=True)
-        for v in [ident] + [relabel(ident, s, smaller_first=True) for s in range(3)]:
-            assert all(e[0] <= e[1] for e in v.edge_seq), v.variant_id
-            old_of_new = {new: old for old, new in v.label_map.items()}  # still the same graph
-            back = [[old_of_new[e[0]], old_of_new[e[1]]] for e in v.edge_seq]
-            assert normalize_edges(back, False) == normalize_edges(inst.edges, False)
-
-
-def test_smaller_first_leaves_directed_edges_and_the_positional_ablation_alone():
-    inst = INSTANCES[0]
-    directed = GraphInstance(id="d", dataset="graphqa", task="node_count", directed=True, weighted=False,
-                             nodes=[0, 1, 2], edges=[[2, 0], [0, 1]], query_args={}, answer_type="int", ground_truth=3)
-    base = canonical(directed, structure="edge_list", syntax="plain")
-    assert relabel(base, 0, smaller_first=True).edge_seq == relabel(base, 0).edge_seq
-    base = canonical(inst, structure="edge_list", syntax="plain")
-    assert relabel(base, 0, sort=False, smaller_first=True).edge_seq == relabel(base, 0, sort=False).edge_seq
-
-
-def test_prompt_fixes_change_only_the_relabel_axis_and_mark_the_variants():
-    for inst in INSTANCES:
-        canon_cfg = {"structure": "edge_list", "syntax": "plain"}
-        off = make_variants(inst, canonical(inst, **canon_cfg), full_spec("edge_list"))
-        on = make_variants(inst, canonical(inst, **canon_cfg), full_spec("edge_list"), prompt_fixes=True)
-        assert [v.variant_id for v in on] == [v.variant_id for v in off]
-        assert not any("prompt_fixes" in v.params for v in off)  # the published variants are unchanged
-        for a, b in zip(off, on):
-            assert b.params == {**a.params, "prompt_fixes": True}
-            if a.axis != "relabel":
-                assert (a.node_seq, a.edge_seq, render(a)) == (b.node_seq, b.edge_seq, render(b, prompt_fixes=True))
-            else:
-                assert all(e[0] <= e[1] for e in b.edge_seq) and normalize_edges(a.edge_seq, False) == true_edge_set(b)
-
-
-def test_an_empty_graph_says_so():
-    v = canonical(EMPTY, structure="edge_list", syntax="graphqa_nl")
-    assert render(v).endswith("The edges in G are: .")  # the published text (graphqa-er-0025)
-    assert render(v, prompt_fixes=True).endswith("The edges in G are: (none).")
-
-
-def test_prompt_fixes_render_every_graph_with_edges_as_before():
-    for inst in INSTANCES:
-        for canon_cfg in CANONS:
-            for v in make_variants(inst, canonical(inst, **canon_cfg), full_spec(canon_cfg["structure"])):
-                assert render(v, prompt_fixes=True) == render(v), v.variant_id
