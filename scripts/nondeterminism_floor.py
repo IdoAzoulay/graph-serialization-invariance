@@ -1,16 +1,16 @@
-"""E0: the nondeterminism floor, measured with the invariance metric's own definitions.
+"""The nondeterminism (repeat) floor, measured with the invariance metric's own definitions.
 
 How often does an IDENTICAL prompt give a different answer? Every "the answer changed under a
 permutation" number is only evidence about the permutation to the extent it exceeds this.
 
-    python mitigation/scripts/nondeterminism_floor.py --config configs/graphqa.yaml \
-        --models m1 m2 --instances 100 --repeats 4 --out mitigation/results/graphqa/noise_floor.json \
-        --per-instance mitigation/results/graphqa/noise_floor_instances.jsonl
+    python scripts/nondeterminism_floor.py --config configs/graphqa.yaml \
+        --models m1 m2 --instances 100 --repeats 4 --out results/review/floor/graphqa/noise_floor.json \
+        --per-instance results/review/floor/graphqa/noise_floor_instances.jsonl
 
 The committed files come from `--models hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b
 hf-deepseek-v4-flash` (that order). `--per-instance` was added later and run cache-only, with the
 API keys blanked; the JSON it wrote alongside was byte-identical to the committed one, so the rows
-are exactly what the JSON summarizes. `mitigation/scripts/floor_stats.py` tests those rows.
+are exactly what the JSON summarizes. `scripts/floor_stats.py` tests those rows.
 
 Definitions match `gsi.analysis.tables.invariance_table`, which the first version of this script
 did not:
@@ -83,7 +83,7 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     ap.add_argument("--per-instance", default=None,
                     help="also write one JSONL row per (model, arm, reference, axis, instance) with the repeat "
-                         "answers and the form answers, for mitigation/scripts/floor_stats.py")
+                         "answers and the form answers, for scripts/floor_stats.py")
     args = ap.parse_args()
 
     cfg = load_config(args.config)

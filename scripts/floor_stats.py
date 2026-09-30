@@ -1,14 +1,15 @@
-"""E0 statistics: is each permutation flip rate above the repeat-noise floor? No inference.
+"""Repeat-floor statistics: is each permutation flip rate above the repeat-noise floor? No inference.
 
-    python mitigation/scripts/floor_stats.py --rule literal
-    python mitigation/scripts/floor_stats.py --rule flip
+    python scripts/floor_stats.py --rule literal
+    python scripts/floor_stats.py --rule flip
 
 Reads the per-instance rows `nondeterminism_floor.py --per-instance` writes
-(mitigation/results/<dataset>/noise_floor_instances.jsonl, both datasets) and writes, for the chosen
-rule, mitigation/results/floor_stats_<rule>_cells.csv (one row per dataset x model x arm x axis),
+(results/review/floor/<dataset>/noise_floor_instances.jsonl, both datasets) and writes, for the chosen
+rule, results/review/floor/floor_stats_<rule>_cells.csv (one row per dataset x model x arm x axis),
 floor_stats_<rule>_pooled.csv (per model: all cells, per dataset, per arm) and
-floor_stats_<rule>_modes.csv (per dataset x arm, for each model and for the four models together;
-the flip-rule file is the paper's Table D2).
+floor_stats_<rule>_modes.csv (per dataset x arm, for each model and for the four models together).
+The paper quotes the flip rule's cells (Section 5.1 and Appendix D: how far Qwen3-8B's code exceeds its
+floor, and in how many cells the other models' code does).
 
 Rules. When do k answers "agree"?
   * literal -- the rule of nondeterminism_floor.py and noise_floor.json: every answer parsed and all
@@ -67,8 +68,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]          # mitigation/
-REPO = ROOT.parent
+from gsi.analysis.tuples import durkalski
+
+REPO = Path(__file__).resolve().parents[1]
+FLOOR = REPO / "results" / "review" / "floor"
 DATASETS = ["graphqa", "erdos"]
 RULES = ("literal", "flip")
 ARMS = ["direct/-", "code/native", "code/networkx"]   # the paper's column order: M1, plain Python, NetworkX
@@ -123,12 +126,7 @@ def mcnemar_exact(b: int, c: int) -> float:
 
 def mcnemar_clustered(b_by_cluster, c_by_cluster) -> float:
     """Durkalski et al. (2003): X = (sum_k (b_k - c_k))^2 / sum_k (b_k - c_k)^2, chi-square(1)."""
-    d = np.asarray(b_by_cluster, float) - np.asarray(c_by_cluster, float)
-    den = float((d ** 2).sum())
-    if den == 0:
-        return 1.0
-    x = float(d.sum()) ** 2 / den
-    return math.erfc(math.sqrt(x / 2))
+    return durkalski(list(b_by_cluster), list(c_by_cluster))[1]
 
 
 def bh(pvalues) -> np.ndarray:
@@ -317,10 +315,10 @@ def analyse(df: pd.DataFrame, reps: int, seed: int):
 
 def check_against_json(cells: pd.DataFrame) -> None:
     """Literal rule: the recomputed floor, flip rate, excess and Wald interval must match
-    mitigation/results/<dataset>/noise_floor.json."""
+    results/review/floor/<dataset>/noise_floor.json."""
     checked = 0
     for ds in DATASETS:
-        report = json.loads((ROOT / "results" / ds / "noise_floor.json").read_text())["report"]
+        report = json.loads((FLOOR / ds / "noise_floor.json").read_text())["report"]
         for model, arms in report.items():
             for arm_ref, r in arms.items():
                 arm = arm_ref.split("|")[0]
@@ -348,7 +346,7 @@ def check_against_scored(is_correct: Correctness) -> None:
     variant). Skipped, with a note, when the scored records are not on disk."""
     checked = records = unmatched = 0
     for ds in DATASETS:
-        rows = [json.loads(line) for line in (ROOT / "results" / ds / "noise_floor_instances.jsonl").open()]
+        rows = [json.loads(line) for line in (FLOOR / ds / "noise_floor_instances.jsonl").open()]
         ids = {r["instance_id"] for r in rows}
         scored_dir = REPO / "results" / ds / "scored"
         files = [scored_dir / f"{m}.jsonl" for m in dict.fromkeys(r["model"] for r in rows)]
@@ -390,10 +388,10 @@ def main() -> None:
                     help="literal: noise_floor.json's agreement rule; flip: the paper's flip rule (see above)")
     ap.add_argument("--bootstrap", type=int, default=10000, help="graph-bootstrap resamples (default 10000)")
     ap.add_argument("--seed", type=int, default=20260928, help="bootstrap seed (default 20260928, as committed)")
-    ap.add_argument("--out-dir", default=str(ROOT / "results"))
+    ap.add_argument("--out-dir", default=str(FLOOR))
     args = ap.parse_args()
     is_correct = Correctness.from_configs() if args.rule == "flip" else None
-    df = pd.concat([load(ROOT / "results" / ds / "noise_floor_instances.jsonl", args.rule, is_correct)
+    df = pd.concat([load(FLOOR / ds / "noise_floor_instances.jsonl", args.rule, is_correct)
                     for ds in DATASETS])
     cells, pooled, modes = analyse(df, args.bootstrap, args.seed)
     if args.rule == "literal":
