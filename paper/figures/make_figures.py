@@ -228,9 +228,10 @@ def fig_start():
 
 
 # ---------------------------------------------------------------- Figure 6: flips that take the other reading
-READING = [("Gemma, disconnected nodes (107)", 100.0), ("DS-V4-Flash, connected nodes (185)", 71.9),
-           ("DS-V3.1, connected nodes (38)", 71.1), ("Qwen, disconnected nodes (151)", 65.6),
-           ("Qwen, Erdős neighbors (76)", 100.0)]
+# Relabeling and order, flips in which every serialization is answered, with order tuples including the reference.
+READING = [("Gemma, disconnected nodes (117)", 100.0), ("DS-V4-Flash, connected nodes (201)", 73.1),
+           ("DS-V3.1, connected nodes (42)", 66.7), ("Qwen, disconnected nodes (161)", 64.6),
+           ("Qwen, Erdős neighbors (84)", 100.0)]
 
 
 def fig_reading():
