@@ -2394,6 +2394,49 @@
    "readings coincide": 18
   }
  },
+ "other_reading_code_flips_all_answered": {
+  "erdos|neighbor|hf-deepseek-v3.1-novita": {
+   "flips": 4,
+   "strict subset of true neighbours": 4
+  },
+  "erdos|neighbor|hf-qwen3-8b-nscale": {
+   "flips": 84,
+   "strict subset of true neighbours": 84
+  },
+  "graphqa|connected_nodes|hf-deepseek-v3.1-novita": {
+   "flips": 42,
+   "takes the other reading": 28,
+   "other": 14
+  },
+  "graphqa|connected_nodes|hf-deepseek-v4-flash": {
+   "flips": 201,
+   "takes the other reading": 147,
+   "other": 52,
+   "readings coincide": 2
+  },
+  "graphqa|connected_nodes|hf-qwen3-8b-nscale": {
+   "flips": 2,
+   "readings coincide": 2
+  },
+  "graphqa|disconnected_nodes|hf-deepseek-v3.1-novita": {
+   "flips": 2,
+   "takes the other reading": 2
+  },
+  "graphqa|disconnected_nodes|hf-gemma-4-31b": {
+   "flips": 117,
+   "takes the other reading": 117
+  },
+  "graphqa|disconnected_nodes|hf-qwen3-8b-nscale": {
+   "flips": 161,
+   "takes the other reading": 104,
+   "other": 45,
+   "readings coincide": 12
+  }
+ },
+ "other_reading_graphqa_all_answered": {
+  "flips": 525,
+  "takes_the_other_reading": 398
+ },
  "figure_intervals_relabel+order": {
   "erdos|all|M1": {
    "flip": [

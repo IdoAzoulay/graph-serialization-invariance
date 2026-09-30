@@ -17,6 +17,7 @@ results/*/*
 # Keep the audit and paper-metric outputs alongside the published analysis.
 !results/review/*.json
 !results/review/*.csv
+!results/review/floor/
 # Outputs of the offline smoke check (configs/smoke.yaml)
 results/smoke/
 

@@ -368,7 +368,7 @@ out["within_task_rise_largest_vs_smallest_third"] = {a: dict(tasks=int((W.arm ==
 # tuple equal the other reading's answer? GraphQA's "connected to" questions (undirected graphs) read as either
 # adjacency or reachability; Erdős `neighbor` means the successors on a directed graph and the neighbours on an
 # undirected one. Tags use the answers that exist; `with_crash` counts the flips in which some serialization
-# gave no answer (they are tagged on the rest).
+# gave no answer (they are tagged on the rest); the paper counts only the others (`..._all_answered`).
 alt = {}
 for iid, r in inst.items():
     if r["task"] in READING_TASKS and r["query_args"].get("node") is not None:
@@ -387,6 +387,14 @@ for (d, t, m), g in TG.groupby(["dataset", "task", "model"]):
     reading_out[f"{d}|{t}|{m}"] = dict(flips=int(len(g)), with_crash=int(g.with_crash.sum()),
                                        **{k: int(v) for k, v in g.tag.value_counts().items()})
 out["other_reading_code_flips"] = reading_out
+# The paper (Section 5.3, Figure B5) counts only the flips in which every serialization is answered.
+TA = TG[~TG.with_crash]
+out["other_reading_code_flips_all_answered"] = {
+    f"{d}|{t}|{m}": dict(flips=int(len(g)), **{k: int(v) for k, v in g.tag.value_counts().items()})
+    for (d, t, m), g in TA.groupby(["dataset", "task", "model"])}
+QA = TA[(TA.dataset == "graphqa") & TA.task.isin(["connected_nodes", "disconnected_nodes"])]
+out["other_reading_graphqa_all_answered"] = dict(flips=int(len(QA)),
+                                                 takes_the_other_reading=int((QA.tag == "takes the other reading").sum()))
 
 # ---------------------------------------------------------------- bootstrap CIs for the figures (relabel+order)
 # Figures 1 and B1 pool M2 over its two libraries and the models; Figures B2-B3 keep the models apart. Same

@@ -37,15 +37,14 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/erdos_m3fix/tables/ablation/*.csv`: graph-type omission ablation | `scripts/graph_type_ablation.py` |
 | `results/review/{summary.json,paired_intervals.csv}`: descriptive audit, paired graph bootstrap | `scripts/audit_results.py` |
 | `results/review/paper_metrics.json`: the paper's metric set for the main experiment | `scripts/paper_metrics.py` |
-| `mitigation/results/<dataset>/permutation_signal{,_fliprule}.csv`: the disagreement detector and voting | `mitigation/scripts/permutation_signal.py` |
-| `mitigation/results/floor_stats_*.csv`: the repeat floor against the flip rates (Table D2) | `mitigation/scripts/floor_stats.py` |
+| `results/review/floor/floor_stats_*.csv`: the repeat floor against the flip rates (Section 5.1, Appendix D) | `scripts/floor_stats.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
 
 Every CSV and JSON file comes out byte-identical to the committed one, and so do the figures' contents (their bytes carry the Matplotlib version and a timestamp). Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2.
 
 Every figure reads its numbers from `paper_metrics.json`. The figure files keep their original names; in the paper they are Figure 1 (`fig2_flip_by_mode`), Figure 2 (`fig4_graph_size`), Figures B1-B5 (`fig3_weighted_by_mode`, `figB1_flip_by_model`, `figB2_weighted_by_model`, `fig5_where_flips_start`, `fig6_other_reading`) and Figure D1 (`fig1_tuple`). The LaTeX source in `paper/` is still the version of the snapshot, written before commit d987c4f fixed four metric computations, so some of its printed numbers differ from `paper_metrics.json`; the final paper replaces it.
 
-Tests: `.venv/bin/python -m pytest` (the main suite, about 35 s, no network) and `.venv/bin/python -m pytest mitigation/tests`.
+Tests: `.venv/bin/python -m pytest` (about 45 s, no network).
 
 ## Repository layout
 
@@ -64,8 +63,6 @@ configs/            experiment configs (graphqa, erdos, erdos_m3fix, smoke) and 
 data/processed/     the sampled instances (instances.jsonl), pinned so the graphs never drift
 results/            committed tables and figures; scored records are restored here (git-ignored)
 paper/              LaTeX source, figures and the compiled PDF
-mitigation/         separable mitigation experiments (noise floor, detection, voting, canonical
-                    labeling, one solver per task); see mitigation/README.md
 tests/              pytest suite for the main pipeline
 tmp/                files probably no longer needed (the pilot config, unused model entries, a cost
                     monitor); see tmp/README.md

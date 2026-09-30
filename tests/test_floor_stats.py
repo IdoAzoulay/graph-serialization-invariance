@@ -1,4 +1,4 @@
-"""E0 floor statistics (mitigation/scripts/floor_stats.py, loaded by path)."""
+"""Repeat-floor statistics (scripts/floor_stats.py, loaded by path)."""
 import importlib.util
 import json
 import math
@@ -10,6 +10,7 @@ import pandas as pd
 from gsi.data.base import GraphInstance
 
 ROOT = Path(__file__).resolve().parents[1]
+FLOOR = ROOT / "results" / "review" / "floor"
 
 
 def load(name):
@@ -139,7 +140,7 @@ def test_flip_rule_on_a_tiny_case(tmp_path):
 
 
 def test_literal_rule_reproduces_noise_floor_json():
-    df = pd.concat([fs.load(ROOT / "results" / ds / "noise_floor_instances.jsonl") for ds in fs.DATASETS])
+    df = pd.concat([fs.load(FLOOR / ds / "noise_floor_instances.jsonl") for ds in fs.DATASETS])
     cells, _, _ = fs.analyse(df, reps=50, seed=0)
     assert len(cells) == 48
     fs.check_against_json(cells)  # asserts n, floor, flip rate, excess and the Wald interval of every cell
@@ -147,9 +148,9 @@ def test_literal_rule_reproduces_noise_floor_json():
 
 def test_committed_literal_cells_match_a_rerun():
     """The committed cell table is what the script computes with its default bootstrap settings."""
-    df = pd.concat([fs.load(ROOT / "results" / ds / "noise_floor_instances.jsonl") for ds in fs.DATASETS])
+    df = pd.concat([fs.load(FLOOR / ds / "noise_floor_instances.jsonl") for ds in fs.DATASETS])
     cells, pooled, _ = fs.analyse(df, reps=10000, seed=20260928)
-    committed = pd.read_csv(ROOT / "results" / "floor_stats_literal_cells.csv")
+    committed = pd.read_csv(FLOOR / "floor_stats_literal_cells.csv")
     assert committed[["dataset", "model", "arm", "axis", "n", "b", "c"]].equals(
         cells[["dataset", "model", "arm", "axis", "n", "b", "c"]])
     assert np.allclose(committed[["floor", "flip", "excess", "boot_lo", "boot_hi"]],
@@ -157,12 +158,12 @@ def test_committed_literal_cells_match_a_rerun():
 
 
 def test_committed_flip_rule_table_matches_a_rerun():
-    """The flip-rule table per dataset x arm (the paper's Table D2) is what the script computes."""
+    """The flip-rule table per dataset x arm is what the script computes."""
     is_correct = fs.Correctness.from_configs()
-    df = pd.concat([fs.load(ROOT / "results" / ds / "noise_floor_instances.jsonl", "flip", is_correct)
+    df = pd.concat([fs.load(FLOOR / ds / "noise_floor_instances.jsonl", "flip", is_correct)
                     for ds in fs.DATASETS])
     _, _, modes = fs.analyse(df, reps=10000, seed=20260928)
-    committed = pd.read_csv(ROOT / "results" / "floor_stats_flip_modes.csv")
+    committed = pd.read_csv(FLOOR / "floor_stats_flip_modes.csv")
     assert committed[["dataset", "arm", "model", "n", "b", "c"]].equals(modes[["dataset", "arm", "model", "n", "b", "c"]])
     assert np.allclose(committed[["floor", "flip", "excess", "boot_lo", "boot_hi"]],
                        modes[["floor", "flip", "excess", "boot_lo", "boot_hi"]], atol=1e-5)
