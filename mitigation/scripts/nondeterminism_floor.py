@@ -4,7 +4,13 @@ How often does an IDENTICAL prompt give a different answer? Every "the answer ch
 permutation" number is only evidence about the permutation to the extent it exceeds this.
 
     python mitigation/scripts/nondeterminism_floor.py --config configs/graphqa.yaml \
-        --models m1 m2 --instances 100 --repeats 4 --out mitigation/results/graphqa/noise_floor.json
+        --models m1 m2 --instances 100 --repeats 4 --out mitigation/results/graphqa/noise_floor.json \
+        --per-instance mitigation/results/graphqa/noise_floor_instances.jsonl
+
+The committed files come from `--models hf-qwen3-8b-nscale hf-deepseek-v3.1-novita hf-gemma-4-31b
+hf-deepseek-v4-flash` (that order). `--per-instance` was added later and run cache-only, with the
+API keys blanked; the JSON it wrote alongside was byte-identical to the committed one, so the rows
+are exactly what the JSON summarizes. `mitigation/scripts/floor_stats.py` tests those rows.
 
 Definitions match `gsi.analysis.tables.invariance_table`, which the first version of this script
 did not:
@@ -20,6 +26,13 @@ did not:
   * for the same instances, the observed flip rate on each permutation axis is reported next to
     the floor with a paired 95% interval on the difference. That is the number to quote; the
     floor is not subtracted from anything.
+
+Answers are compared literally here: two different correct answers (two shortest paths) disagree,
+and a reply that fails to parse disagrees even with an identical failure. The paper's flip rule
+(correct answers count as one value, missing answers as another) is applied afterwards, from the
+per-instance rows, by `floor_stats.py --rule flip`. The interval above is a Wald interval per cell,
+with no correction for the 48 cells or for instances sharing a graph; `floor_stats.py` adds
+mid-p McNemar with Benjamini-Hochberg, a clustered McNemar and a bootstrap over graphs.
 """
 from __future__ import annotations
 
@@ -68,6 +81,9 @@ def main() -> None:
     ap.add_argument("--instances", type=int, default=100)
     ap.add_argument("--repeats", type=int, default=4)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--per-instance", default=None,
+                    help="also write one JSONL row per (model, arm, reference, axis, instance) with the repeat "
+                         "answers and the form answers, for mitigation/scripts/floor_stats.py")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -89,6 +105,7 @@ def main() -> None:
           f"{n_ref / len(picked):.2f} reference prompts = {n_ref * len(ARMS) * args.repeats} calls per model")
 
     report = {}
+    inst_rows: list[dict] = []
     for name in args.models:
         spec = specs[name]
         client = make_client(spec, cfg.cache_dir)
@@ -154,6 +171,22 @@ def main() -> None:
                             continue
                         flips.append(0 if agree(got) else 1)
                         floors.append(floor_by_inst[iid])
+                        if args.per_instance:
+                            inst = instances[iid]
+                            ref_rec = scored.get(record_id(ref_v, mode, lib, name))
+                            inst_rows.append({
+                                "dataset": cfg.name, "model": name, "mode": mode, "library": lib,
+                                "ref": ref, "axis": axis, "instance_id": iid, "task": inst.task,
+                                "graph_id": inst.meta.get("graph_id"), "source_file": inst.meta.get("source_file"),
+                                "repeats": [answers[k][r] for r in range(args.repeats)],
+                                "ref_key": ref_rec["answer_key"] if ref_rec else None,
+                                # same_prompt: the form's prompt is byte-identical to the reference's
+                                # (GraphQA's identity relabeling), so it reuses the reference's reply
+                                "forms": [{"variant_id": v.variant_id,
+                                           "key": scored[record_id(v, mode, lib, name)]["answer_key"],
+                                           "same_prompt": v.text == ref_v.text}
+                                          for v in forms if record_id(v, mode, lib, name) in scored],
+                                "flip": flips[-1], "floor": floors[-1]})
                     if flips:
                         d = np.array(flips, float) - np.array(floors, float)
                         se = d.std(ddof=1) / np.sqrt(len(d)) if len(d) > 1 else float("nan")
@@ -184,6 +217,11 @@ def main() -> None:
             json.dump({"config": cfg.name, "repeats": args.repeats, "instances": len(picked),
                        "stratified": True, "report": report}, f, indent=1)
         print(f"\nwritten to {args.out}")
+    if args.per_instance:
+        with open(args.per_instance, "w") as f:
+            for row in inst_rows:
+                f.write(json.dumps(row) + "\n")
+        print(f"{len(inst_rows)} per-instance rows written to {args.per_instance}")
 
 
 if __name__ == "__main__":
