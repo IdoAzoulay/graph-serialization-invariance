@@ -123,17 +123,21 @@ def instances_for(cfg: ExperimentConfig, rebuild: bool) -> list[GraphInstance]:
     return instances
 
 
-def build_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
+def make_all_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
+    """Every instance's variants, rendered, as the variants stage builds them (nothing is written)."""
     out: dict[str, list[Variant]] = {}
-    rows = []
     for inst in instances:
         canon = canonical(inst, **cfg.canonical_for(inst.dataset))
-        vs = make_variants(inst, canon, cfg.variants_for(inst.dataset))
+        vs = make_variants(inst, canon, cfg.variants_for(inst.dataset), prompt_fixes=cfg.prompt_fixes)
         for v in vs:
-            v.text = render(v)
-            rows.append(v.to_dict())
+            v.text = render(v, prompt_fixes=cfg.prompt_fixes)
         out[inst.id] = vs
-    write_jsonl(cfg.data_dir / "variants.jsonl", rows)
+    return out
+
+
+def build_variants(cfg: ExperimentConfig, instances: list[GraphInstance]) -> dict[str, list[Variant]]:
+    out = make_all_variants(cfg, instances)
+    write_jsonl(cfg.data_dir / "variants.jsonl", (v.to_dict() for inst in instances for v in out[inst.id]))
     return out
 
 
@@ -146,6 +150,12 @@ def load_variants(cfg: ExperimentConfig) -> dict[str, list[Variant]]:
     for d in read_jsonl(cfg.data_dir / "variants.jsonl"):
         v = Variant.from_dict(d)
         out.setdefault(v.instance_id, []).append(v)
+    # variants.jsonl fixes the prompts' graph text, so one built under the other `prompt_fixes` setting
+    # would silently ask the other prompts
+    built = {bool(v.params.get("prompt_fixes")) for vs in out.values() for v in vs}
+    if built and built != {cfg.prompt_fixes}:
+        raise SystemExit(f"{cfg.data_dir / 'variants.jsonl'} was not built with prompt_fixes: {cfg.prompt_fixes} "
+                         f"as the config says; run the variants stage")
     return out
 
 
