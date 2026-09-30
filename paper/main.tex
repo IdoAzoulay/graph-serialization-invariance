@@ -63,14 +63,14 @@
 
 \begin{abstract}
 
-Language models often answer graph questions better by writing code than by answering directly. If the answer depends on how the graph is serialized, however, a correct answer for one serialization does not guarantee a correct answer for another. \textbf{We ask:} \textbf{\emph{does solving a graph problem using code generation return the same answer under equivalent serializations of the same graph, and if not, at which step does the fragility enter?}} Across four models and two datasets, changing one aspect of the serialization at a time, we find that code generation is far more robust to the serialization, changing its answer two to five times less often than direct answering, a gap that grows with graph size, yet no condition in which the model reads the graph is fully invariant. The fragility enters mostly in the program the model writes, not in its copy of the graph. Keeping the graph out of the prompt nearly removes the sensitivity at no cost in accuracy.
+Language models often answer graph questions better by writing code than by answering directly. However, the answer can depend on how the graph is serialized, and a correct answer for one serialization does not guarantee a correct answer for another. \textbf{We ask:} \textbf{\emph{does solving a graph problem using code generation return the same answer under equivalent serializations of the same graph, and if not, at which step does the fragility enter?}} Across four models and two datasets, changing one aspect of the serialization at a time, we find that code generation is far more robust to the serialization, changing its answer two to five times less often than direct answering, a gap that grows with graph size, yet no condition in which the model reads the graph is fully invariant. The fragility enters mostly in the program the model writes, not in its copy of the graph. We also find that keeping the graph out of the prompt nearly removes the sensitivity at no cost in accuracy.
 \end{abstract}
 
 \section{Introduction}
 
 Large language models typically receive graphs as serialized text. The choice of serialization affects both accuracy \citep{fatemi} and permutation invariance: renaming nodes or reordering edges leaves the graph and the question unchanged, yet can change the answer \citep{ge,herbst}. Code generation has proved one of the strongest ways to answer graph questions \citep{cai,finkelshtein}, but higher accuracy does not necessarily mean invariance across serializations \citep{herbst}.
 
- We send each graph question to the model in three ways. In direct answering (M1), the model reads the serialized graph and replies with the answer. In code from text (M2), it reads the same graph and replies with a Python program that copies the graph and computes the answer when we run it. In Graph-as-Code (M3), it writes the program from the question alone, and we pass the graph to the program as data when we run it. Comparing M1 with M2 shows how much code generation reduces the sensitivity to serialization. The M2 programs show where the remaining sensitivity enters, in the model's copy of the graph or in the program it writes. M3 tests whether keeping the graph out of the prompt removes the sensitivity without losing accuracy. 
+ We send each graph question to the model in three ways. In direct answering (M1), the model reads the serialized graph and replies with the answer. In code from text (M2), it reads the same graph and replies with a Python program that copies the graph and computes the answer when we run it. In Graph-as-Code (M3), it writes the program from the question alone, and we pass the graph to the program as data when we run it. Comparing M1 with M2 shows whether code generation comes closer to serialization invariance: returning the same answer for every equivalent serialization of the same graph. The M2 programs show where the remaining violations enter, in the model's copy of the graph or in the program it writes. M3 tests whether keeping the graph out of the prompt restores invariance without losing accuracy. 
 
 Our contributions are as follows. (i) A per-instance, single-factor invariance measurement of \emph{executed} code over four models and two datasets. (ii) Evidence that when the answer changes, the cause is rarely a wrong copy of the graph but the program the model writes. (iii) We introduce a mitigation that keeps the graph out of the prompt and nearly removes the sensitivity at no cost in accuracy, provided the prompt states the graph type.
 
@@ -106,7 +106,7 @@ Both code modes run in two library arms: native, limited to the Python standard 
 
 \subsection{Serialization Factors}\label{sec:factors}
 
-The reference serialization is the dataset's own edge list. Every other serialization changes exactly one of four factors, so that a change in the answer can be attributed to that factor. \textbf{Relabeling} applies a random permutation of the node labels to the graph and to the question and maps node-valued answers back. \textbf{Order} lists the edges in three orderings: sorted by the first endpoint, by the second, or shuffled. \textbf{Structure} adds two serializations: an adjacency list, and, for undirected graphs, an edge list in which each edge is written twice, as (u, v) and (v, u). \textbf{Syntax} writes the same edge list as plain text, JSON or NetworkX code (Erdős: JSON and NetworkX code only).
+The baseline serialization is the dataset's own edge list. Every other serialization changes exactly one of four factors, so that a change in the answer can be attributed to that factor. \textbf{Relabeling} applies a random permutation of the node labels to the graph and to the question and maps node-valued answers back. \textbf{Order} lists the edges in three orderings: sorted by the first endpoint, by the second, or shuffled. \textbf{Structure} adds two serializations: an adjacency list, and, for undirected graphs, an edge list in which each edge is written twice, as (u, v) and (v, u). \textbf{Syntax} writes the same edge list as plain text, JSON or NetworkX code (Erdős: JSON and NetworkX code only).
 
 \section{Experimental Setup}
 
@@ -114,19 +114,19 @@ The reference serialization is the dataset's own edge list. Every other serializ
 
 We test four models of different sizes: Qwen3-8B (Alibaba, 8B parameters), Gemma 4 31B (Google, 31B), DeepSeek-V4-Flash (284B, of which 13B are active for each token) and DeepSeek-V3.1 (671B, 37B active).
 
-\textbf{Inference:} All four models run through the same API gateway with the same settings: temperature 0, at most 4,096 output tokens, and reasoning turned off, so that direct answering stays a direct answer rather than a hidden chain of thought (Appendix~\ref{app:tuples}). Generated programs run in a separate process with a time limit.
+\textbf{Inference:} All four models run through the same API gateway with the same settings: temperature 0, at most 4,096 output tokens, and reasoning turned off, so that direct answering stays a direct answer rather than a hidden chain of thought. Generated programs run in a separate process with a time limit.
 
 \textbf{Scale:} Each model answers every serialization of every instance in all five conditions (Section~\ref{sec:modes}): 44,625 answers per model on GraphQA and 71,230 on Erdős.
 
 \subsection[Metrics]{Metrics}\label{sec:metrics}
 
-\textbf{Terms:} A \emph{factor} is the kind of change: relabeling, edge order, structure or syntax (Section~\ref{sec:factors}). A \emph{serialization} is one concrete text of a graph. A \emph{tuple} collects the answers one model gives, in one mode, to the serializations of one instance under one factor (Figure~\ref{fig:1}). Under relabeling, for example, a tuple holds four answers: to the reference labeling and to three random relabelings. Table~\ref{tab:D1} in Appendix~\ref{app:tuples} gives the tuple sizes.
+\textbf{Terms:} A \emph{factor} is the kind of change: relabeling, edge order, structure or syntax (Section~\ref{sec:factors}). A \emph{serialization} is one concrete text of a graph. A \emph{tuple} collects the answers one model gives, in one interaction mode, to the serializations of one instance under one factor (Figure~\ref{fig:1}). Under relabeling, for example, a tuple holds four answers: to the baseline labeling and to three random relabelings. Table~\ref{tab:D1} in Appendix~\ref{app:tuples} gives the tuple sizes.
 
-\textbf{Correctness:} An answer is correct when it equals the true answer. When a question has several correct answers, for example two equally short paths, any of them is correct. Real-valued answers are compared with a small tolerance (Appendix~\ref{app:tuples}). A crash, a timeout or an unreadable reply counts as wrong.
+\textbf{Correctness:} An answer is correct when it equals the true answer. When a question has several correct answers, for example two equally short paths, any of them is correct. Real-valued answers are compared with a small tolerance. A crash, a timeout or an unreadable reply counts as wrong.
 
 \textbf{Performance:} Accuracy is the share of all answers that are correct. Robust accuracy is the share of tuples in which every answer is correct.
 
-\textbf{Invariance:} A tuple \emph{flips} when at least one of its answers differs from the others. When a question has several correct answers, they count as the same answer, and a missing answer counts as an answer of its own. The flip rate is the share of tuples that flip. Crossing flips with correctness divides the tuples into six buckets (Table~\ref{tab:1}): (1) the same correct answer on every serialization, (2) the same wrong answer, (3) different answers that are all correct, (4) a flip in which every serialization is answered, (5) a flip with a crash, and (6) no answer on any serialization. Buckets 4 and 5 are the flips, and bucket 2 holds errors that invariance cannot see.
+\textbf{Invariance:} A tuple \emph{flips} when at least one of its answers differs from the others. When a question has several correct answers, they count as the same answer, and a missing answer counts as an answer of its own. The flip rate is the share of tuples that flip. Crossing the flips with correctness divides the tuples into six buckets (Table~\ref{tab:1}): (1) the same correct answer on every serialization, (2) the same wrong answer, (3) different answers that are all correct, (4) a flip in which every serialization is answered, (5) a flip with a crash, and (6) no answer on any serialization.
 
 \textbf{Weighted flips:} The flip rate treats every flip alike, whether one answer deviates or all of them differ. We therefore define two measures on a tuple with answers $a_1, \ldots, a_n$ and true answer $y$. $D$ is the fraction of answer pairs that differ, and $S$ is the range of the answers relative to the true answer:
 \begin{gather*}
@@ -138,13 +138,13 @@ $D$ is 0 when all answers agree and 1 when all differ: (1, 2, 2, 2) has $D = 0.5
 
 \textbf{Localization:} We trace M2 failures to one of three steps: the copy of the graph (the program declares a wrong graph), a crash (it gives no answer) or the program's solving step (otherwise). Each wrong answer is assigned the first of these steps that failed, and each flipped tuple the step at which its serializations diverge.
 
-\textbf{Statistics:} Every rate is computed per dataset, mode and factor, with the four models weighted equally. Brackets are 95\% confidence intervals with errors clustered by graph, and whiskers are 95\% bootstrap intervals over graphs (Appendix~\ref{app:tuples}).
+\textbf{Statistics:} Every rate is computed per dataset, mode and factor, with the four models weighted equally. Brackets are 95\% confidence intervals with errors clustered by graph, and whiskers are 95\% bootstrap intervals over graphs.
 
 \section{Results and Discussion}
 
 \subsection{Does executed code keep its answer, and more often than direct answering?}\label{sec:rq1}
 
-Executed code flips far less often than direct answering (Figure~\ref{fig:2}), but is still not invariant. Under relabeling and edge order, direct answers (M1) flip on 11.9\% of GraphQA and 20.8\% of Erdős tuples. Code from text (M2) flips on 4.8\% and 3.5\% in plain Python and 6.8\% and 4.5\% with NetworkX. Code flips significantly less (McNemar's test) in 14 of 16 model $\times$ dataset $\times$ code library cells. Both exceptions are Gemma 4 31B on GraphQA, whose direct answers are already the most stable (3.0\%). In a logistic regression with model, task and factor held fixed, M2's plain-Python code has 0.47 [0.41, 0.54] times direct answering's odds of a flip on GraphQA and 0.20 [0.17, 0.22] on Erdős, and NetworkX code 0.52 [0.44, 0.61] and 0.31 [0.27, 0.36]. Figures~\ref{fig:B1} and~\ref{fig:B2} (Appendix~\ref{app:permodel}) give each model.
+Executed code flips far less often than direct answering, but is still not invariant (Figure~\ref{fig:2}). Under relabeling and edge order, direct answers (M1) flip on 11.9\% of GraphQA and 20.8\% of Erdős tuples. Code from text (M2) flips on 4.8\% and 3.5\% in plain Python and 6.8\% and 4.5\% with NetworkX. Code flips significantly less (McNemar's test) in 14 of 16 model $\times$ dataset $\times$ code library cells. Both exceptions are Gemma 4 31B on GraphQA, whose direct answers are already the most stable (3.0\%). In a logistic regression with model, task and factor held fixed, M2's plain-Python code has 0.47 [0.41, 0.54] times direct answering's odds of a flip on GraphQA and 0.20 [0.17, 0.22] on Erdős, and NetworkX code 0.52 [0.44, 0.61] and 0.31 [0.27, 0.36]. Figures~\ref{fig:B1} and~\ref{fig:B2} (Appendix~\ref{app:permodel}) give each model.
 
 \begin{figure}[t]
 \centering
@@ -153,7 +153,7 @@ Executed code flips far less often than direct answering (Figure~\ref{fig:2}), b
 \label{fig:2}
 \end{figure}
 
-On Erdős, code's flips are also milder (Figure~\ref{fig:3}). Four in five plain-Python flips have a single serialization out of line ($D = 0.5$), against two in five for direct answering. Severity is 0.54 against 0.71, so weighting by $D$ widens the gap from 6$\times$ to 8$\times$. On GraphQA severity barely differs (0.56 against 0.62).
+On Erdős, code's flips are also milder (Figure~\ref{fig:3}). Four in five plain-Python flips have a single serialization out of line ($D = 0.5$), against two in five for direct answering. Severity is 0.54 against 0.71, so weighting by $D$ widens the gap from 6$\times$ to 8$\times$.
 
 The gap grows with the graph (Figure~\ref{fig:4}). From graphs with up to 10 edges to graphs with more than 40, direct answering's flip rate rises from 7.7\% to 23.1\% on GraphQA and from 6.1\% to 36.2\% on Erdős, while code stays between 1.5\% and 8.2\%. In a logistic regression with task and model held fixed, each doubling of the edge count multiplies direct answering's odds of a flip by 1.60 [1.46, 1.74] on GraphQA and 2.44 [2.19, 2.71] on Erdős, and plain-Python code's by 0.96 [0.86, 1.08] and 1.52 [1.34, 1.72].
 
@@ -164,7 +164,7 @@ The gap grows with the graph (Figure~\ref{fig:4}). From graphs with up to 10 edg
 \label{fig:4}
 \end{figure}
 
-Although we use temperature 0, the same prompt asked again can get a different answer, so part of every flip rate is noise. Only Qwen3-8B's code clearly exceeds this repeat floor (Appendix~\ref{app:tuples}).
+Although we use temperature 0, the same prompt asked again can get a different answer, so part of every flip rate is noise. Only Qwen3-8B's code clearly exceeds this repeat floor.
 
 A stable answer is not always a correct one (Table~\ref{tab:1}, per model in Table~\ref{tab:B1}). On GraphQA, 8.1\% of plain-Python tuples give the same wrong answer on every serialization. Most of them come from one question, which nodes are not connected to a given node, where DeepSeek-V3.1 and DeepSeek-V4-Flash both list the nodes it cannot reach instead of those without a direct edge to it. Invariance cannot see these errors, so we report robust accuracy beside it (Table~\ref{tab:3}).
 
@@ -222,11 +222,9 @@ Most flips start in the program the model writes, and few in its copy of the gra
 
 Failures are not flips, though, so Figure~\ref{fig:5} attributes each flip itself to where its serializations diverge. On GraphQA, 95.5\% of plain-Python flips start in the program. On Erdős the program still leads (61.5\%), but a crash starts 20.9\%, mostly DeepSeek-V4-Flash's, and a wrong copy 17.6\%: 35 of DeepSeek-V3.1's 40 flips come from a wrong copy of a long edge list.
 
-The M3 control points the same way: under edge order, Graph-as-Code runs one fixed program on every ordering and flips on 0.0-0.1\% of tuples, against 3.5-6.3\% for M2 (significantly more in 12 of 16 cells). Since M3 also hides the graph from the model, this is a diagnostic, not a causal estimate.
+The M3 control points the same way: under edge order, Graph-as-Code runs one fixed program on every ordering and flips on 0.0-0.1\% of tuples, against 3.5-6.3\% for M2. Since M3 also hides the graph from the model, this is a diagnostic, not a causal estimate.
 
-When code flips, the programs for different serializations often answer different readings of the question (Figure~\ref{fig:6}). Under relabeling and order, on the two GraphQA questions that ask which nodes are, or are not, connected to a given node, 76\% of the code flips in which every serialization is answered (398 of 525) contain exactly the other reading's answer, reachable nodes instead of neighbours or the reverse. On the Erdős \texttt{neighbor} task, all 84 such flips of Qwen3-8B contain a strict subset of the true neighbours, because the program records each edge in one direction only, as if the graph were directed.
-
-Finally, our first Graph-as-Code run on Erdős did not state that the graph is undirected. Where the task's preamble names ``directed'' only to define a conditional that does not apply (\texttt{neighbor}), \emph{all four models} built a directed graph on every undirected instance they could be observed on, and every arm scored 28/100. Stating the type gives 100/100. 
+When code flips, the programs for different serializations often answer different readings of the question (Figure~\ref{fig:6}). Two GraphQA questions ask which nodes are, or are not, connected to a given node, which can mean directly connected (its neighbours) or connected by a path (all nodes reachable from it). Under relabeling and order, 76\% of their code flips in which every serialization is answered (398 of 525) come from programs that exactly answer the other meaning: they return the reachable nodes when the question means neighbours, or the reverse.
 
 \subsection{Keeping the graph out of the prompt}\label{sec:m3}
 
@@ -254,17 +252,15 @@ Erdős & 78.6 & 95.9 & 90.2 & \textbf{97.3} & 89.0 \\
 \label{tab:3}
 \end{table}
 
-Without the graph text, the prompt itself must say whether the graph is directed (Section~\ref{sec:localize}), so Table~\ref{tab:3} reports M3 on Erdős from a rerun that states the type in every undirected prompt (GraphQA's prompts already do). Table~\ref{tab:E1} in Appendix~\ref{app:m3first} gives the first run.
+In Graph-as-Code the model never sees the edges, so the prompt must tell it whether the graph is directed. Our first Erdős run left this out, and the \texttt{neighbor} task's description mentions ``directed'' only in a rule that does not apply to these graphs. As a result, \emph{all four models} treated every undirected graph we could check as directed, and its accuracy fell to 28/100 in every setting. Adding one line that states the graph type raised it to 100/100. Table~\ref{tab:3} therefore uses this corrected rerun for M3 on Erdős (GraphQA's prompts already state the type), and Table~\ref{tab:E1} in Appendix~\ref{app:m3first} gives the original run.
 
-Two limits remain: with NetworkX, M3 stays about 2 points below code from text in accuracy, and its errors are systematic: when the question names no node, one program answers every instance of a task (Appendix~\ref{app:tuples}), so a wrong program is wrong on every graph and every serialization.
+Two limits remain: with NetworkX, M3 stays about 2 points below code from text in accuracy, and its errors are systematic: when the question names no node, one program answers every instance of a task, so a wrong program is wrong on every graph and every serialization.
 
 \section{Conclusion and Limitations}
 
-Executed code keeps its answer far more often than direct answering under relabeling and edge order, and its advantage grows with the size of the graph, but it is not invariant, and not under every factor. Listing each edge in both directions brings plain-Python code close to direct answering, and writing the graph as NetworkX code makes two models' NetworkX programs crash, because they act as if the prompt's code had already run. Graphs are transcribed almost perfectly, and the flips start in the program the model writes, which often answers a different reading of the question.
+We asked whether code generation gives the same answer when the same graph is serialized differently, and where it fails to. Our results give three takeaways. First, code is far more robust than direct answering, and its advantage grows with the size of the graph, but it is not invariant, and some serializations still break it, such as writing each edge twice. Second, the fragility does not come from reading the graph. Models copy the graph almost perfectly, and the answer changes because the program they write changes, often to answer a different reading of the question. Third, keeping the graph out of the prompt nearly removes the sensitivity at no cost in accuracy, provided the prompt states the graph type. Its errors become systematic, however, so a stable answer is still no guarantee of a correct one.
 
-Keeping the graph out of the prompt nearly removes the sensitivity at no cost in accuracy if the prompt states the graph type, though its errors become systematic.
-
-Our study has several limits. We test four models through one gateway and cannot control how deterministic the providers serving them are: even at temperature 0, an identical prompt sometimes gets a different answer, so part of every flip rate is noise that repeated prompts can only estimate. Every experiment but the repeat baseline uses one generation per prompt. The graphs are small (5-20 and 4-34 nodes), and we use 12 of Erdős's 50 tasks. The prompts are zero-shot, with reasoning turned off and NetworkX permitted, not required, so reasoning models or other prompts may behave differently. Finally, each serialization changes one factor at a time, so we do not test factors in combination.
+Our study has several limits. We test four models through one gateway and cannot control how deterministic the providers serving them are: even at temperature 0, an identical prompt sometimes gets a different answer, so part of every flip rate is noise that repeated prompts can only estimate. Apart from the repeat-floor check, every experiment uses one generation per prompt. The graphs are small (5-20 and 4-34 nodes), and we use 12 of Erdős's 50 tasks. The prompts are zero-shot, with reasoning turned off and NetworkX permitted, not required, so reasoning models or other prompts may behave differently. Finally, each serialization changes one factor at a time, so we do not test factors in combination.
 
 \bibliography{references}
 
@@ -342,7 +338,7 @@ edges = [(1, 2), (1, 4), (2, 3)]
 \label{fig:A1}
 \end{figure*}
 
-\FloatBarrier
+\clearpage
 \section[Additional Results]{ Additional Results}\label{app:permodel}
 
 \begin{figure}[!htbp]
@@ -468,45 +464,8 @@ Syntax & \textbf{12.0} & 3.3 & 4.1 & 8.2 & 0.7 & 1.6 \\
 \end{minipage}
 \end{table*}
 
-\begin{table*}[!htbp]
-\centering
-\small
-\begin{tabular}{@{}ll*{6}{>{\centering\arraybackslash}p{2.4em}}@{}}
-\toprule
- &  & \multicolumn{2}{c}{Direct} & \multicolumn{2}{c}{Native} & \multicolumn{2}{c}{NetworkX} \\
-\cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(l){7-8}
-Dataset & Model & I & R & I & R & I & R \\
-\midrule
-GraphQA & Qwen3-8B & 76 & 70 & 94 & 94 & 88 & 85 \\
-GraphQA & Gemma 4 31B & 97 & 87 & 96 & 95 & 95 & 95 \\
-GraphQA & DeepSeek-V4-F & 90 & 76 & 93 & 75 & 92 & 79 \\
-GraphQA & DeepSeek-V3.1 & 89 & 74 & 97 & 85 & 97 & 84 \\
-Erdős & Qwen3-8B & 50 & 51 & 86 & 89 & 62 & 65 \\
-Erdős & Gemma 4 31B & 92 & 96 & 95 & 100 & 96 & 100 \\
-Erdős & DeepSeek-V4-F & 76 & 80 & 92 & 96 & 95 & 99 \\
-Erdős & DeepSeek-V3.1 & 84 & 88 & 94 & 98 & 92 & 97 \\
-\bottomrule
-\end{tabular}
-\caption[Consistency I and correctness R]{ Proposed for removal: this table uses the earlier consistency measure I (literally identical answers), which the paper no longer defines. Table~\ref{tab:B1} gives the same comparison with the current buckets.}
-\label{tab:B3}
-\end{table*}
-
 \FloatBarrier
 \section[Setup and Metric Details]{ Setup and Metric Details}\label{app:tuples}
-
-\textbf{Serializations.} Relabeling sorts the renamed edge list again and compares it against the original labeling, sorted the same way, so both follow the same ordering rule. The two sorted orderings break ties in random order. On Erdős, whose original edge list is not sorted, full sorting replaces the second-endpoint ordering. The adjacency list has one line per node followed by its neighbours. For GraphQA this is the paper's ``incident'' encoding. The NetworkX-code syntax is code that builds the graph.
-
-\textbf{Failure labels.} The copy step of the localization (Section~\ref{sec:metrics}) is approximate: declarations are read after execution, and the comparison ignores edge weights and multiplicity.
-
-\textbf{Inference.} Qwen3-8B, Gemma and DeepSeek-V4-Flash have a switch for reasoning, and DeepSeek-V3.1 answers without reasoning by default. Besides keeping direct answers direct, turning reasoning off keeps a model from spending the whole token budget before it answers: Qwen3-8B with reasoning on often returned no answer at all.
-
-\textbf{Repeated prompts.} Two serializations sometimes produce exactly the same prompt. This is common in M3, whose prompt holds the question but not the graph: when the question names no node, every serialization of an instance, and every instance of the task, gives the same M3 prompt. We send each distinct prompt once and reuse its reply, so in M3 one program can answer many graphs. Only 56-57\% of all prompts are separate model calls.
-
-\textbf{Correctness.} Density and diameter on Erdős are real numbers, so there we accept an answer within 0.01 of the true value (1\% for values above 1), so that a density written as 0.27 instead of 0.2727 counts.
-
-\textbf{Spread.} $S$ uses only the answers that exist and divides by 1 when $y = 0$.
-
-\textbf{Statistics.} McNemar's exact test (flips) and the Wilcoxon signed-rank test ($D$) are run for each model, dataset and library and Holm-corrected over the 16 cases. The logistic regression, one per dataset, models flipping on mode, factor, model and task, with errors clustered by graph. Bootstrap intervals resample the graphs of each dataset with replacement 2,000 times. The repeat floor reports how often the answer to an identical prompt changes, under the same flip rule: Qwen3-8B's code exceeds it in all 8 cells, by 4.0-11.0 points, while the other three models' code does so in only 3 of 24 (95\% Wald interval on the excess above 0), so their small residual is close to noise.
 
 \begin{figure}[!htbp]
 \centering
@@ -522,22 +481,18 @@ Erdős & DeepSeek-V3.1 & 84 & 88 & 94 & 98 & 92 & 97 \\
 \toprule
 Factor & Answers in a tuple & GraphQA & Erdős \\
 \midrule
-Relabeling & reference labeling + 3 random relabelings & 4 (699 tuples), 3 (1) & 4 (1,199), 3 (1) \\
+Relabeling & baseline labeling + 3 random relabelings & 4 (699 tuples), 3 (1) & 4 (1,199), 3 (1) \\
 Order & dataset's own order + 3 reorderings & 4 (587), 3 (63), 2 (39) & 4 (1,133), 3 (58), 2 (9) \\
-Structure & reference + adjacency list + each edge in both directions & 3 (700) & 3 (1,123), 2 (77) \\
-Syntax & reference + plain text, JSON, NetworkX code & 4 (700) & 3, JSON and NetworkX code only (1,200) \\
+Structure & baseline + adjacency list + each edge in both directions & 3 (700) & 3 (1,123), 2 (77) \\
+Syntax & baseline + plain text, JSON, NetworkX code & 4 (700) & 3, JSON and NetworkX code only (1,200) \\
 \bottomrule
 \end{tabular}
-\caption{Answers per tuple, with the number of tuples of each size per model and mode. A serialization identical to its reference is dropped, which shortens some tuples: 11 GraphQA instances have no order tuple, one random relabeling per dataset came out as the identity, and the 77 directed Erdős graphs have no both-directions serialization.}
+\caption{Answers per tuple, with the number of tuples of each size per model and mode. A serialization identical to its baseline is dropped, which shortens some tuples: 11 GraphQA instances have no order tuple, one random relabeling per dataset came out as the identity, and the 77 directed Erdős graphs have no both-directions serialization.}
 \label{tab:D1}
 \end{table*}
 
 \FloatBarrier
 \section{M3 Without the Stated Graph Type}\label{app:m3first}
-
-Table~\ref{tab:E1} repeats Table~\ref{tab:3} with the first M3 run on Erdős, whose prompts did not state that the graph is undirected (Section~\ref{sec:m3}). Plain-Python M3 is then 5.7 points below code from text on Erdős, almost all of it on \texttt{neighbor}. The M3 control in Section~\ref{sec:localize} uses this first run.
-
-The omission is also partly invisible: in the first run, 12 of the 84 undirected \texttt{neighbor} answers were still correct. The rerun adds ``The graph is undirected: (u, v) and (v, u) denote the same edge.'' to every undirected M3 prompt. Stating the type raises \texttt{neighbor} from 28 to 100 of 100 for every model and library and also fixes two single-model misreadings, DeepSeek-V3.1's \texttt{has\_cycle} and Gemma's \texttt{edge\_existence}. Because every M3 program was generated afresh, a few tasks answered by a single program also moved by chance in both directions (for example \texttt{bridges}). In the first run, where the preamble asserts that the graph is undirected, no program built a directed graph, and where it says nothing only one did. Where it describes both cases, Gemma built a directed graph for 69\% of recovered graphs, nearly three quarters still correct.
 
 \begin{table}[!htbp]
 \centering

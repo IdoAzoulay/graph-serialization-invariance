@@ -37,7 +37,7 @@ git status                    # CSV/JSON outputs: no changes expected
 | `results/erdos_m3fix/tables/ablation/*.csv`: graph-type omission ablation | `scripts/graph_type_ablation.py` |
 | `results/review/{summary.json,paired_intervals.csv}`: descriptive audit, paired graph bootstrap | `scripts/audit_results.py` |
 | `results/review/paper_metrics.json`: the paper's metric set for the main experiment | `scripts/paper_metrics.py` |
-| `results/review/floor/floor_stats_*.csv`: the repeat floor against the flip rates (Section 5.1, Appendix C), from the committed repeat answers in `results/review/floor/<dataset>/` | `scripts/floor_stats.py` |
+| `results/review/floor/floor_stats_*.csv`: the repeat floor against the flip rates (Section 5.1), from the committed repeat answers in `results/review/floor/<dataset>/` | `scripts/floor_stats.py` |
 | `paper/figures/*.pdf` | `paper/figures/make_figures.py` |
 
 Every CSV and JSON file comes out byte-identical to the committed one, and so do the figures' contents (their bytes carry the Matplotlib version and a timestamp). Checked with Python 3.14.6, pandas 3.0.6, numpy 2.5.3, scipy 1.18.1, statsmodels 0.15.0, networkx 3.7 and matplotlib 3.11.2; an older stack (Python 3.11, numpy 2.4, scipy 1.17) changes the last digit of three p-values in `paper_metrics.json` and of one value near 1e-18 in `floor_stats_literal_cells.csv`, and nothing else.

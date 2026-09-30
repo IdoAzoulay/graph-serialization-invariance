@@ -63,7 +63,7 @@ def ci_handle(ax, label="95% interval"):
 
 
 # ---------------------------------------------------------------- Figure C1: one tuple
-TUPLE_ANSWERS = [9, 9, 4, 10]  # Qwen3-8B, Erdős triangles-0000, direct: reference and three relabelings
+TUPLE_ANSWERS = [9, 9, 4, 10]  # Qwen3-8B, Erdős triangles-0000, direct: baseline and three relabelings
 TRUE_ANSWER = 9
 # A schematic graph (two triangles sharing a node), drawn identically in every panel; only the labels move.
 G_POS = {0: (0.0, 1.0), 1: (0.0, 0.0), 2: (0.5, 0.5), 3: (1.0, 1.0), 4: (1.0, 0.0)}
@@ -75,7 +75,7 @@ RIGHT, WRONG, SAME, DIFF = "#1f9e89", "#d1495b", "#ececec", "#e8702a"
 def fig_tuple():
     """What a tuple is and how D grades a flip, on one real tuple.
 
-    Left: the same graph under the reference labeling and three relabelings, each with the answer the model
+    Left: the same graph under the baseline labeling and three relabelings, each with the answer the model
     gave (green: correct, red: wrong); the four answers form one tuple. Right: every pair of answers, shaded
     when the two differ; D is the shaded share. Coordinates are points on a 218 x 96 pt canvas (one column
     wide), y pointing down.
@@ -85,7 +85,7 @@ def fig_tuple():
     ax.set_xlim(0, 218); ax.set_ylim(96, 0); ax.axis("off"); ax.set_aspect("equal")
 
     # --- left: four serializations of one instance, one answer each
-    titles = ["Reference", "Relabeling 1", "Relabeling 2", "Relabeling 3"]
+    titles = ["Baseline", "Relabeling 1", "Relabeling 2", "Relabeling 3"]
     x0, pw, gap, top = 2, 31, 4, 9
     right_edge = x0 + 4 * pw + 3 * gap
     ax.text(x0, 4, "Same graph, new node names", fontsize=6.2, weight="bold", color=INK, va="center")

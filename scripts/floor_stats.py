@@ -8,8 +8,8 @@ Reads the per-instance rows `nondeterminism_floor.py --per-instance` writes
 rule, results/review/floor/floor_stats_<rule>_cells.csv (one row per dataset x model x arm x axis),
 floor_stats_<rule>_pooled.csv (per model: all cells, per dataset, per arm) and
 floor_stats_<rule>_modes.csv (per dataset x arm, for each model and for the four models together).
-The paper quotes the flip rule's cells (Section 5.1 and Appendix C: how far Qwen3-8B's code exceeds its
-floor, and in how many cells the other models' code does).
+Section 5.1 of the paper rests on the flip rule's cells: Qwen3-8B's code clearly exceeds its floor,
+and the other models' code rarely does.
 
 Rules. When do k answers "agree"?
   * literal -- the rule of nondeterminism_floor.py and noise_floor.json: every answer parsed and all
