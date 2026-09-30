@@ -42,13 +42,14 @@ import statsmodels.formula.api as smf
 from scipy.stats import binomtest, wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from gsi.analysis.tuples import READING_TASKS, divergence_site, failure_step, reading_tag, spread
+from gsi.analysis.tuples import (READING_TASKS, divergence_site, durkalski, failure_step, is_double, like_for_like,
+                                 reading_tag, spread)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ["graphqa", "erdos"]
 MODELS = ["hf-qwen3-8b-nscale", "hf-deepseek-v3.1-novita", "hf-gemma-4-31b", "hf-deepseek-v4-flash"]
 COLS = ["dataset", "task", "instance_id", "variant_id", "axis", "params", "mode", "library", "model",
-        "answer_key", "parsed", "correct", "failure_class", "declared_ok"]
+        "answer_key", "parsed", "correct", "failure_class", "declared_ok", "prompt_hash"]
 RNG = np.random.default_rng(0)
 ARMS_M12 = ["direct", "code/native", "code/networkx"]
 FACTORS = ["relabel", "order", "structure", "syntax"]
@@ -426,9 +427,13 @@ out["figure_intervals_relabel+order"] = fig_ci  # {dataset|model or all|M1 or M2
 
 # ---------------------------------------------------------------- the Erdős M3 rerun
 # Nothing from here on draws random numbers. results/erdos_m3fix reruns M3 on Erdős with the graph type stated in
-# its prompts; M1, M2 and GraphQA have one run each.
+# its prompts; M1, M2 and GraphQA have one run each. RUNS holds each run's answers and tuples: "erdos" is the main
+# run (its M3 is the first M3 run), "erdos_rerun" holds M3 only.
 j3 = answer_frame([r for r in read_scored("erdos_m3fix") if r["mode"] == "graph_as_code"])
 T3 = build_tuples(j3)[0]
+RUNS = {"graphqa": (j[j.dataset == "graphqa"], T[T.dataset == "graphqa"]),
+        "erdos": (j[j.dataset == "erdos"], T[T.dataset == "erdos"]), "erdos_rerun": (j3, T3)}
+ARMS = ARMS_M12 + ["graph_as_code/native", "graph_as_code/networkx"]
 
 
 def sig_counts(df, a, b):
@@ -467,6 +472,129 @@ for run, t_m3 in [("first_run", T), ("rerun", pd.concat([T[T.dataset == "graphqa
         mc_axis_sum[f"{run}|{fac}"] = dict(cells=len(df), m2_more_sig=m2_more, m3_more_sig=m3_more)
 out["mcnemar_m2_vs_m3_by_axis"] = mc_axis  # {first_run or rerun|factor: [cells]}
 out["mcnemar_m2_vs_m3_by_axis_summary"] = mc_axis_sum
+
+
+# ---------------------------------------------------------------- performance of every mode (Tables 3 and E1)
+# accuracy: every serialization the mode answered; like_for_like_accuracy: the reference, relabelings and edge
+# orders only (tuples.like_for_like), the serializations every mode is compared on; robust_accuracy and flip_rate:
+# relabel+order tuples. Table 3 takes Erdős M3 from erdos_rerun, Table E1 from erdos.
+def mode_summary(a, t):
+    lfl, ro = a[a.axis.map(like_for_like)], t[t.axis.isin(PERM)]
+    return dict(answers=int(len(a)), accuracy=round(100 * a.correct.mean(), 1), like_for_like_answers=int(len(lfl)),
+                like_for_like_accuracy=round(100 * lfl.correct.mean(), 1), tuples=int(len(ro)),
+                robust_accuracy=round(100 * ro.robust.mean(), 1), flip_rate=round(100 * ro.flip.mean(), 1))
+
+
+out["performance_by_mode"] = {f"{run}|{arm}": mode_summary(a[a.arm == arm], t[t.arm == arm])
+                              for run, (a, t) in RUNS.items() for arm in ARMS if (a.arm == arm).any()}
+# GraphQA without edge_existence ("Is node u connected to node v?", which also reads as reachability)
+qa, qt = (x[x.task != "edge_existence"] for x in RUNS["graphqa"])
+out["performance_by_mode_graphqa_without_edge_existence"] = {arm: mode_summary(qa[qa.arm == arm], qt[qt.arm == arm])
+                                                             for arm in ARMS}
+
+# ---------------------------------------------------------------- M3 flip rate by factor
+m3_flip = {}
+for run, (_, t) in RUNS.items():
+    for (arm, fac), d in fam(t[t.arm.str.startswith("graph_as_code")]).groupby(["arm", "factor"]):
+        m3_flip[f"{run}|{arm.split('/')[1]}|{fac}"] = dict(tuples=int(len(d)), flips=int(d.flip.sum()),
+                                                          flip_rate=round(100 * d.flip.mean(), 1))
+out["m3_flip_rate"] = m3_flip  # {run|library|factor}
+
+# ---------------------------------------------------------------- invariance per model (Tables B1 and B2)
+BUCKETS = ["same_correct", "same_wrong", "different_all_correct", "flip_all_answered", "flip_with_crash",
+           "no_answer_all"]
+out["invariance_per_model"] = {
+    f"{ds}|{arm}|{fac}|{model}": dict(tuples=int(len(d)), flip_rate=round(100 * d.flip.mean(), 1),
+                                      buckets={b: round(100 * (d.bucket == b).mean(), 1) for b in BUCKETS})
+    for (ds, arm, fac, model), d in fam(M12).groupby(["dataset", "arm", "factor", "model"])}
+# The daggers of Tables 2 and B2: cells in which a model's code flips at least 1 point more often than its own
+# direct answers (unrounded rates)
+fr = M12.groupby(["dataset", "axis", "model", "arm"]).flip.mean().mul(100)
+out["dagger_cells"] = [dict(dataset=ds, factor=fac, model=model, arm=arm, code_flip=round(v, 1),
+                            direct_flip=round(fr[(ds, fac, model, "direct")], 1))
+                       for (ds, fac, model, arm), v in fr.items()
+                       if arm != "direct" and v - fr[(ds, fac, model, "direct")] >= 1]
+
+# ---------------------------------------------------------------- tuple sizes (Table D1)
+# Answers per tuple follow from the serializations alone, so every model and mode has the same sizes.
+sizes = {}
+for (ds, ax), d in M12.groupby(["dataset", "axis"]):
+    prof = d.groupby(["model", "arm"]).n.apply(lambda s: tuple(sorted(s.value_counts().items(), reverse=True)))
+    assert prof.nunique() == 1, (ds, ax, prof.unique())
+    sizes[f"{ds}|{ax}"] = {str(n): int(c) for n, c in prof.iat[0]}
+out["tuple_sizes"] = sizes  # {dataset|factor: {answers per tuple: tuples}}, per model and mode
+
+# ---------------------------------------------------------------- McNemar code vs direct, clustered by graph
+# mcnemar_code_vs_direct treats a model's tuples as independent; a graph's tuples are not. Durkalski's test
+# sums each graph's discordant pairs (tuples.durkalski); same 16 cells, Holm over them.
+dir_flip = RO[RO.arm == "direct"].set_index(key)[["flip", "cluster"]]
+cl_rows = []
+for lib in ["native", "networkx"]:
+    pairs = dir_flip.join(RO[RO.arm == f"code/{lib}"].set_index(key)[["flip"]], rsuffix="_code", how="inner")
+    pairs = pairs.assign(b=(pairs.flip & ~pairs.flip_code).astype(int), c=(~pairs.flip & pairs.flip_code).astype(int))
+    for (ds, model), g in pairs.reset_index().groupby(["dataset", "model"]):
+        per = g.groupby("cluster")[["b", "c"]].sum()
+        x, p = durkalski(per.b.tolist(), per.c.tolist())
+        cl_rows.append(dict(dataset=ds, model=model, library=lib, graphs=int(len(per)), only_direct=int(per.b.sum()),
+                            only_code=int(per.c.sum()), statistic=x, p=p))
+CL = pd.DataFrame(cl_rows)
+CL["p_holm"] = multipletests(CL.p, method="holm")[1]
+out["mcnemar_code_vs_direct_clustered"] = CL.round(4).to_dict("records")
+code_better, direct_better = sig_counts(CL, "only_direct", "only_code")
+out["mcnemar_code_vs_direct_clustered_summary"] = dict(cells=len(CL), code_better_sig=code_better,
+                                                       direct_better_sig=direct_better)
+
+# ---------------------------------------------------------------- the declared graph (M2)
+# Share of M2 answers (both libraries) whose program declared the graph it was given (declared_ok True; an
+# unknown counts as no match), and how many answers are correct although the declared graph is wrong.
+M2 = j[j["mode"] == "code"]
+out["declared_graph_match"] = {
+    f"{ds}|{model}": dict(answers=int(len(g)), match_pct=round(100 * g.declared_ok.eq(True).mean(), 2))
+    for (ds, model), g in M2.groupby(["dataset", "model"])}
+out["correct_despite_wrong_declared_graph"] = {
+    ds: dict(wrong_declared=int(len(g)), correct=int(g.correct.sum()), correct_pct=round(100 * g.correct.mean(), 1))
+    for ds, g in M2[M2.declared_ok.eq(False)].groupby("dataset")}
+
+# ---------------------------------------------------------------- doubled degrees under structure
+# GraphQA node_degree answers on the two structure serializations that are exactly twice the true degree
+# (tuples.is_double): the adjacency list, and the edge list with every edge in both directions.
+nd = j[(j.task == "node_degree") & (j.axis == "structure") & j.arm.isin(ARMS_M12)]
+nd = nd.assign(
+    kind=np.where(nd.params.map(lambda p: bool((p or {}).get("replicated"))), "both_directions", "adjacency_list"),
+    dbl=[is_double(ak if a else None, truth[i]) for ak, a, i in zip(nd.answer_key, nd.answered, nd.instance_id)])
+out["doubled_node_degree_structure"] = {
+    f"{model}|{arm}": dict(answers=int(len(g)), adjacency_list=int(g[g.kind == "adjacency_list"].dbl.sum()),
+                           both_directions=int(g[g.kind == "both_directions"].dbl.sum()), doubled=int(g.dbl.sum()))
+    for (model, arm), g in nd.groupby(["model", "arm"])}
+
+# ---------------------------------------------------------------- flips and same-wrong tuples by task (relabel+order)
+out["by_task_relabel+order"] = {
+    f"{ds}|{arm}|{task}": dict(tuples=int(len(d)), flips=int(d.flip.sum()), flip_rate=round(100 * d.flip.mean(), 1),
+                               same_wrong=int((d.bucket == "same_wrong").sum()))
+    for (ds, arm, task), d in RO.groupby(["dataset", "arm", "task"])}
+# GraphQA's "connected to" questions: edge_existence and the two node-list tasks
+NODE_LIST = ["connected_nodes", "disconnected_nodes"]
+CONNECTED = ["edge_existence"] + NODE_LIST
+groups = {}
+for arm, d in RO[RO.dataset == "graphqa"].groupby("arm"):
+    sw, rest = d[d.bucket == "same_wrong"], d[~d.task.isin(NODE_LIST)]
+    groups[arm] = dict(same_wrong=int(len(sw)), same_wrong_connected_tasks=int(sw.task.isin(CONNECTED).sum()),
+                       flips=int(d.flip.sum()), flips_node_list_tasks=int(d[d.task.isin(NODE_LIST)].flip.sum()),
+                       other_tasks_tuples=int(len(rest)), other_tasks_flip_rate=round(100 * rest.flip.mean(), 1))
+out["graphqa_task_groups_relabel+order"] = groups
+
+# ---------------------------------------------------------------- distinct prompts
+# A repeated prompt is sent once per model and its reply reused: model_calls = distinct (model, prompt) pairs.
+# In M3 a call is a program, and one program can answer many graphs.
+dp = {}
+for run, (a, _) in RUNS.items():
+    m3 = a[a["mode"] == "graph_as_code"]
+    calls = int(a.groupby("model").prompt_hash.nunique().sum())
+    progs = int(m3.groupby("model").prompt_hash.nunique().sum())
+    dp[run] = dict(records=int(len(a)), model_calls=calls, model_calls_pct=round(100 * calls / len(a), 1),
+                   m3_records=int(len(m3)), m3_programs=progs, m3_programs_pct=round(100 * progs / len(m3), 1),
+                   m3_answers_per_program=round(len(m3) / progs, 1))
+out["distinct_prompts"] = dp
 
 Path(args.out).parent.mkdir(parents=True, exist_ok=True)
 json.dump(out, open(args.out, "w"), indent=1, default=float)
