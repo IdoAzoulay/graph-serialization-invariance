@@ -4,7 +4,7 @@ name: erdos_m3fix
 # Why: M3 removes the graph text, and the harness noted a graph's type only when it was directed, so
 # an undirected M3 prompt stated its type only if the task preamble did. Five of the twelve Erdős
 # preambles do not; `neighbor` mentions only the directed case, and every model read its undirected
-# graphs as directed (neighbor: 28/100 in every M3 arm; paper, Section 5.5 and Appendix E).
+# graphs as directed (neighbor: 28/100 in every M3 arm; see the paper's Graph-as-Code section and Appendix E).
 # `inject_graph_type` adds one sentence to undirected M3 prompts. Nothing else changes: same
 # instances and variants as `erdos`, same template, same models. Direct and code-from-text are not
 # rerun -- their prompts carry the graph text and are unchanged.

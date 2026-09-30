@@ -34,6 +34,8 @@ hf-qwen3-8b-nscale:
 
 # ---- Mid-size points between Qwen3-8B (8.2B) and DeepSeek-V3.1 (684.5B, HF safetensors totals) ----
 # Total parameters: 8.2 -> 31.3 -> 290.9 -> 684.5 (x3.8, x9.3, x2.4), one provider for both.
+# The paper quotes the model cards instead: DeepSeek-V4-Flash 284B total with 13B active per
+# token, DeepSeek-V3.1 671B with 37B active (the safetensors totals include extra weights).
 # Gemma 4 31B (Google) is dense; DeepSeek-V4-Flash is MoE with 13B active and shares a company
 # with the 684.5B point, chosen over Tencent Hy3 for cost. Thinking is switched off through the
 # chat template, as for Qwen3-8B, so every model answers without a hidden chain of thought.
