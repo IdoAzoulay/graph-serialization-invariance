@@ -221,7 +221,7 @@ for (ds, lib, fac), g in CODE.groupby(["dataset", "library", "factor"]):
                                       counts={k: int((fails.step == k).sum()) for k in ["copy", "solve", "run", "other"]})
 out["localization_a"] = loc_a
 
-# ---------------------------------------------------------------- localization (b)
+# ---------------------------------------------------------------- localization (b) (Figure B4)
 FB = fam(T[T.arm.str.startswith("code/") & T.flip])
 loc_b = {}
 for (ds, arm, fac), g in FB.groupby(["dataset", "arm", "factor"]):
@@ -328,7 +328,7 @@ for (ds, arm, fac), g in fam(M12).groupby(["dataset", "arm", "factor"]):
                                        median=round(float(s.median()), 2), q3=round(float(s.quantile(.75)), 2))
 out["S_quartiles"] = sq
 
-# ---------------------------------------------------------------- graph size (Figure 1)
+# ---------------------------------------------------------------- graph size (Figure 2)
 P = M12[M12.axis.isin(PERM)].copy()
 P["m"] = P.instance_id.map(lambda i: len(inst[i]["edges"]))
 P["bin"] = pd.cut(P.m, bins=[-1, 10, 20, 40, 10**6], labels=["up to 10", "11 to 20", "21 to 40", "over 40"])
@@ -363,7 +363,7 @@ out["within_task_rise_largest_vs_smallest_third"] = {a: dict(tasks=int((W.arm ==
                                                             median_points=round(float(W[W.arm == a].rise.median()), 1))
                                                      for a in ["direct", "code/native"]}
 
-# ---------------------------------------------------------------- other reading (Figure 6)
+# ---------------------------------------------------------------- other reading (Figure B5)
 # Flipped M2 tuples (relabel and order, both libraries) of the node-list questions: does some answer in the
 # tuple equal the other reading's answer? GraphQA's "connected to" questions (undirected graphs) read as either
 # adjacency or reachability; Erdős `neighbor` means the successors on a directed graph and the neighbours on an
@@ -389,7 +389,7 @@ for (d, t, m), g in TG.groupby(["dataset", "task", "model"]):
 out["other_reading_code_flips"] = reading_out
 
 # ---------------------------------------------------------------- bootstrap CIs for the figures (relabel+order)
-# Figures 2-3 pool M2 over its two libraries and the models; Figures B1-B2 keep the models apart. Same
+# Figures 1 and B1 pool M2 over its two libraries and the models; Figures B2-B3 keep the models apart. Same
 # resampling as the headline CIs (a dataset's graphs with replacement, 2,000 times, a graph's tuples kept
 # together), with its own generator so that every number above stays as it was.
 RNG_FIG = np.random.default_rng(1)
