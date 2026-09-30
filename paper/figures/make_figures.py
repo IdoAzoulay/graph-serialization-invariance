@@ -1,6 +1,6 @@
 """Draw the paper's figures as vector PDFs next to this file.
 
-The numbers are the ones printed in the paper. Figures 2-4, B1 and B2 read them from
+Every figure but the one-tuple example (fig1_tuple, whose answers are typed in) reads its numbers from
 results/review/paper_metrics.json (scripts/paper_metrics.py), including every 95% interval:
 graphs resampled with replacement 2,000 times, a graph's tuples kept together.
 
@@ -208,9 +208,10 @@ def fig_size():
 
 
 # ---------------------------------------------------------------- Figure 5: where plain-Python flips start
+LOC_B = METRICS["localization_b"]  # dataset|arm|factor -> {flips, program, crash, copy}
 START = {  # condition: (program, crash, copy), % of flipped plain-Python tuples
-    "GraphQA perm.": (95.5, 0.8, 3.8), "GraphQA struct.": (95.9, 1.0, 3.1),
-    "Erdős perm.": (61.5, 20.9, 17.6), "Erdős struct.": (77.2, 9.3, 13.5),
+    f"{ds} {factor}": tuple(LOC_B[f"{DS_KEY[ds]}|code/native|{factor}"][k] for k in ("program", "crash", "copy"))
+    for ds in ("GraphQA", "Erdős") for factor in ("relabel+order", "structure")
 }
 
 
@@ -228,9 +229,23 @@ def fig_start():
 
 
 # ---------------------------------------------------------------- Figure 6: flips that take the other reading
-READING = [("Gemma, disconnected nodes (107)", 100.0), ("DS-V4-Flash, connected nodes (185)", 71.9),
-           ("DS-V3.1, connected nodes (38)", 71.1), ("Qwen, disconnected nodes (151)", 65.6),
-           ("Qwen, Erdős neighbors (76)", 100.0)]
+OTHER = METRICS["other_reading_code_flips"]  # dataset|task|model -> counts of flipped code tuples
+
+
+def reading_share(key):
+    """Flips whose answers include the other reading (or, for Erdős neighbor, a strict subset of the neighbours)."""
+    c = OTHER[key]
+    hits = c.get("takes the other reading", 0) + c.get("strict subset of true neighbours", 0)
+    return c["flips"], 100 * hits / c["flips"]
+
+
+READING = [(f"{label} ({n})", share) for label, (n, share) in [
+    ("Gemma 4 31B, disconnected nodes", reading_share("graphqa|disconnected_nodes|hf-gemma-4-31b")),
+    ("DeepSeek-V4-Flash, connected nodes", reading_share("graphqa|connected_nodes|hf-deepseek-v4-flash")),
+    ("DeepSeek-V3.1, connected nodes", reading_share("graphqa|connected_nodes|hf-deepseek-v3.1-novita")),
+    ("Qwen3-8B, disconnected nodes", reading_share("graphqa|disconnected_nodes|hf-qwen3-8b-nscale")),
+    ("Qwen3-8B, Erdős neighbor", reading_share("erdos|neighbor|hf-qwen3-8b-nscale")),
+]]
 
 
 def fig_reading():

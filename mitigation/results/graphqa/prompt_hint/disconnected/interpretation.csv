@@ -1,0 +1,5 @@
+model,arm,n,correct_base,correct_hint,unreachable_base,unreachable_hint
+hf-deepseek-v3.1-novita,code/native,100,11,100,100,11
+hf-deepseek-v3.1-novita,code/networkx,100,12,100,99,11
+hf-qwen3-8b-nscale,code/native,100,93,93,11,9
+hf-qwen3-8b-nscale,code/networkx,100,46,95,45,11

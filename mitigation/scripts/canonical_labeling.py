@@ -20,7 +20,25 @@ Schemes:
 Writes results/<cfg>/scored_canon/<scheme>/<model>.jsonl and mitigation/results/<cfg>/canonical_labeling.csv
 (paired accuracy deltas); --invariance-only writes mitigation/results/<cfg>/canonical_labeling_invariance.csv (no
 inference): for each scheme, the share of relabelings that render to the same prompt as the
-canonical form does.
+canonical form does. --invariance-only always uses every instance; --limit does not apply to it.
+
+Subset. `--limit N` keeps `instances[::len(instances) // N][:N]`, in the order of
+data/processed/<cfg>/instances.jsonl, which lists GraphQA graph by graph (a graph's seven tasks
+together) and Erdos task by task. The committed canonical_labeling.csv used --limit 400 on GraphQA
+and --limit 150 on Erdos:
+  * GraphQA: 700 // 400 = 1, so the "strided" subset is simply the first 400 instances. They come
+    from 58 of the 100 graphs (graph indices 0000-0057; the 58th contributes one task) and cover
+    all seven generator families, but they are not spread over the dataset.
+  * Erdos: 1200 // 150 = 8, every 8th instance: 12 or 13 per task, 150 graphs.
+The scored_canon records behind the committed table hold exactly these instances, for every model
+and scheme. Changing the selection would need new model calls, so the code keeps it and says what
+it is.
+
+Intervals. ci_lo/ci_hi (vs native labels) and r_ci_lo/r_ci_hi (vs the mean of the random
+relabelings) are normal-approximation 95% intervals, mean +- 1.96 standard errors of the paired
+per-instance differences. They treat instances as independent (on GraphQA, 400 instances from 58
+graphs are not) and are not corrected for the many model x scheme x arm rows. Read them as
+descriptive; they are not the paper's graph-bootstrap intervals.
 """
 from __future__ import annotations
 
@@ -153,7 +171,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--models", nargs="+", default=[])
-    ap.add_argument("--limit", type=int, default=None, help="instances per dataset (strided)")
+    ap.add_argument("--limit", type=int, default=None,
+                    help="keep instances[::len // LIMIT][:LIMIT] in instances.jsonl order; on GraphQA (700) "
+                         "--limit 400 has stride 1, i.e. the first 400 instances (58 graphs). Ignored by "
+                         "--invariance-only")
     ap.add_argument("--schemes", nargs="*", default=list(SCHEMES))
     ap.add_argument("--invariance-only", action="store_true",
                     help="measure each scheme's relabel/order invariance on every instance; no inference")
@@ -172,7 +193,14 @@ def main():
     load_dotenv(cfg.root)
     specs = load_models(cfg.models_file)
     if args.limit:
-        instances = instances[:: max(1, len(instances) // args.limit)][: args.limit]
+        # a stride over the file order, not a random or stratified draw: with len // limit == 1 (GraphQA
+        # at 400) it is the first `limit` instances, i.e. the first graphs with all their tasks
+        stride = max(1, len(instances) // args.limit)
+        instances = instances[::stride][: args.limit]
+        graphs = {i.meta.get("source_file") or i.meta.get("graph_id") or i.id for i in instances}  # as paper_metrics
+        print(f"subset: instances[::{stride}][:{args.limit}] in file order = {len(instances)} instances "
+              f"from {len(graphs)} graphs" + (" (stride 1: the first instances, not a spread-out sample)"
+                                             if stride == 1 else ""), flush=True)
     canon = {i.id: next(v for v in variants[i.id] if v.axis == "canonical") for i in instances}
 
     summary = []
@@ -244,6 +272,7 @@ def main():
                     if rnd:
                         d_random.append(r["correct"] - np.mean([b["correct"] for b in rnd]))
                 def ci(x):
+                    # normal 95% interval over instances: no clustering by graph, no multiplicity correction
                     x = np.array(x, float)
                     if len(x) < 2:
                         return (float("nan"),) * 3
@@ -257,7 +286,8 @@ def main():
                                 "delta_vs_random_relabel": mr, "r_ci_lo": rlo, "r_ci_hi": rhi})
     out = pd.DataFrame(summary)
     pd.set_option("display.width", 220)
-    print(f"\n=== E3: canonical labeling, paired accuracy deltas ({cfg.name}) ===")
+    print(f"\n=== E3: canonical labeling, paired accuracy deltas ({cfg.name}; normal 95% intervals over "
+          f"instances, not clustered by graph) ===")
     print(out.round(3).to_string(index=False))
     path = out_dir(cfg) / "canonical_labeling.csv"
     if path.exists() and not out.empty:

@@ -1,0 +1,13 @@
+model,arm,form,n,doubled_base,doubled_hint
+hf-deepseek-v3.1-novita,code/native,adjacency,100,66,0
+hf-deepseek-v3.1-novita,code/native,canonical,100,0,0
+hf-deepseek-v3.1-novita,code/native,reciprocal,100,81,0
+hf-deepseek-v3.1-novita,code/networkx,adjacency,100,0,0
+hf-deepseek-v3.1-novita,code/networkx,canonical,100,0,0
+hf-deepseek-v3.1-novita,code/networkx,reciprocal,100,0,0
+hf-qwen3-8b-nscale,code/native,adjacency,100,82,9
+hf-qwen3-8b-nscale,code/native,canonical,100,0,13
+hf-qwen3-8b-nscale,code/native,reciprocal,100,94,10
+hf-qwen3-8b-nscale,code/networkx,adjacency,100,0,0
+hf-qwen3-8b-nscale,code/networkx,canonical,100,0,0
+hf-qwen3-8b-nscale,code/networkx,reciprocal,100,0,0

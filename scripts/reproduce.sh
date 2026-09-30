@@ -7,7 +7,7 @@
 #
 # Afterwards `git status` shows what changed. CSV and JSON outputs come out byte-identical to the
 # committed ones; PNG and PDF figures can differ in bytes (library version, timestamps) but not in
-# content. The mitigation experiments are not rerun here (see mitigation/README.md).
+# content. Of the mitigation experiments only the offline parts run here (see mitigation/README.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # the interpreter: $PYTHON if set, else the project venv (POSIX or Windows layout), else python3
@@ -41,6 +41,17 @@ step "paired graph bootstrap (results/review/{summary.json,paired_intervals.csv,
 
 step "paper metrics (results/review/paper_metrics.json; about 2 minutes)"
 "$PY" scripts/paper_metrics.py > /dev/null
+
+if [ -d mitigation ]; then  # the mitigation experiments can be removed as one folder (mitigation/README.md)
+  step "mitigation, offline parts: detector and voting, repeat-floor statistics (mitigation/results/)"
+  for cfg in graphqa erdos; do
+    for rule in literal flip; do
+      "$PY" mitigation/scripts/permutation_signal.py --config configs/$cfg.yaml --rule $rule --models "${MODELS[@]}" > /dev/null
+    done
+  done
+  "$PY" mitigation/scripts/floor_stats.py --rule literal > /dev/null
+  "$PY" mitigation/scripts/floor_stats.py --rule flip > /dev/null
+fi
 
 step "paper figures (paper/figures/)"
 "$PY" paper/figures/make_figures.py > /dev/null

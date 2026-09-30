@@ -48,3 +48,30 @@ def test_recall_on_answered_errors_excludes_crashes():
     e = permutation_signal.evaluate(groups, {"relabel"}, None)
     assert e["errors"] == 3 and e["caught"] == 2 and abs(e["recall"] - 2 / 3) < 1e-9
     assert e["errors_answered"] == 2 and e["caught_answered"] == 1 and e["recall_answered"] == 0.5
+
+
+def test_flip_rule_counts_correct_answers_as_one_and_missing_answers_as_one():
+    two_correct = {"canon": _row("canonical", "[0, 1, 2]", True, "a::canonical"),
+                   "relabel": [_row("relabel", "[0, 3, 2]", True, "a::relabel:s0", 0)], "order": []}
+    all_crash = {"canon": _row("canonical", "null", False, "b::canonical"),
+                 "relabel": [_row("relabel", "null", False, "b::relabel:s0", 0)], "order": []}
+    crash_vs_answer = {"canon": _row("canonical", "null", False, "c::canonical"),
+                       "relabel": [_row("relabel", "4", True, "c::relabel:s0", 0)], "order": []}
+    silent_caught = {"canon": _row("canonical", "5", False, "d::canonical"),
+                     "relabel": [_row("relabel", "4", True, "d::relabel:s0", 0)], "order": []}
+    same_wrong = {"canon": _row("canonical", "5", False, "e::canonical"),
+                  "relabel": [_row("relabel", "5", False, "e::relabel:s0", 0)], "order": []}
+    cases = (two_correct, all_crash, crash_vs_answer, silent_caught, same_wrong)
+    flags = {rule: [permutation_signal.disagree([g["canon"]] + g["relabel"], rule) for g in cases]
+             for rule in permutation_signal.RULES}
+    assert flags == {"literal": [True, True, True, True, False], "flip": [False, False, True, True, False]}
+    groups = {("code/native", x): g for x, g in zip("abcde", cases)}
+    lit = permutation_signal.evaluate(groups, {"relabel"}, None)
+    flip = permutation_signal.evaluate(groups, {"relabel"}, None, "flip")
+    assert lit["flag_rate"] == 0.8 and flip["flag_rate"] == 0.4
+    # the flags on answered errors do not depend on the rule; the vote compares keys under both
+    assert lit["caught_answered"] == flip["caught_answered"] == 1 and lit["errors_answered"] == 2
+    assert lit["vote_acc"] == flip["vote_acc"]
+    # the all-crash instance is no longer flagged: abstaining keeps it, and it is wrong
+    assert lit["abstain_coverage"] == 0.2 and flip["abstain_coverage"] == 0.6
+    assert flip["abstain_acc"] == 1 / 3 and lit["abstain_acc"] == 0.0
