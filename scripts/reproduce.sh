@@ -42,6 +42,9 @@ step "paired graph bootstrap (results/review/{summary.json,paired_intervals.csv,
 step "paper metrics (results/review/paper_metrics.json; about 2 minutes)"
 "$PY" scripts/paper_metrics.py > /dev/null
 
+step "prompt defects: offline impact check (results/review/prompt_bug_check.json)"
+"$PY" scripts/prompt_bug_check.py > /dev/null
+
 step "paper figures (paper/figures/)"
 "$PY" paper/figures/make_figures.py > /dev/null
 
