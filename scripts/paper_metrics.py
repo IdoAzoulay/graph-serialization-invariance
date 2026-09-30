@@ -59,20 +59,31 @@ ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
 ap.add_argument("--out", default=str(ROOT / "results/review/paper_metrics.json"))
 args = ap.parse_args()
 
-rows = []
-for ds in DATASETS:
+miss = lambda v: v is None or (isinstance(v, float) and math.isnan(v))
+
+
+def read_scored(run):
+    """The four models' scored records of one run (results/<run>/scored), restricted to COLS."""
+    rows = []
     for m in MODELS:
-        p = ROOT / "results" / ds / "scored" / f"{m}.jsonl"
+        p = ROOT / "results" / run / "scored" / f"{m}.jsonl"
         if not p.exists():
             raise SystemExit(f"no scored records at {p}; run scripts/restore_from_hf.py")
         with open(p) as fh:
             rows += [{k: r.get(k) for k in COLS} for r in map(json.loads, fh)]
-j = pd.DataFrame(rows)
-j["arm"] = np.where(j["mode"] == "direct", "direct", j["mode"] + "/" + j["library"].astype(str))
-miss = lambda v: v is None or (isinstance(v, float) and math.isnan(v))
-j["answered"] = ~j["parsed"].map(miss)
-j["correct"] = j["correct"].astype(bool)
-j["is_identity"] = j["params"].map(lambda p: (p or {}).get("seed") == "identity")
+    return rows
+
+
+def answer_frame(rows):
+    j = pd.DataFrame(rows)
+    j["arm"] = np.where(j["mode"] == "direct", "direct", j["mode"] + "/" + j["library"].astype(str))
+    j["answered"] = ~j["parsed"].map(miss)
+    j["correct"] = j["correct"].astype(bool)
+    j["is_identity"] = j["params"].map(lambda p: (p or {}).get("seed") == "identity")
+    return j
+
+
+j = answer_frame([r for ds in DATASETS for r in read_scored(ds)])
 
 inst = {}
 for ds in DATASETS:
@@ -91,56 +102,61 @@ def num(x):
 
 
 # ---------------------------------------------------------------- tuples
-rows, reading = [], []  # reading: flipped code tuples of the node-list tasks (the "other reading" analysis)
-for (iid, model, arm), g in j.groupby(["instance_id", "model", "arm"], sort=False):
-    canon = g[g["axis"] == "canonical"]
-    ds, task = g["dataset"].iat[0], g["task"].iat[0]
-    for axis in FACTORS:
-        if arm.startswith("graph_as_code") and axis not in ("relabel", "order"):
-            continue
-        var = g[g["axis"] == axis]
-        sub = var if (axis == "relabel" and var["is_identity"].any()) else pd.concat([canon, var])
-        if sub["variant_id"].nunique() < 2:
-            continue
-        keys = [k if a else "NA" for k, a in zip(sub["answer_key"], sub["answered"])]
-        corr = sub["correct"].tolist()
-        vals = ["CORRECT" if c else k for k, c in zip(keys, corr)]
-        n = len(vals)
-        pairs = list(combinations(vals, 2))
-        D = sum(a != b for a, b in pairs) / len(pairs)
-        flip = D > 0
-        all_answered = "NA" not in keys
-        literal_same = all_answered and len(set(keys)) == 1
-        if literal_same and all(corr):
-            bucket = "same_correct"
-        elif literal_same:
-            bucket = "same_wrong"
-        elif all(corr):
-            bucket = "different_all_correct"
-        elif all(k == "NA" for k in keys):
-            bucket = "no_answer_all"
-        elif flip and all_answered:
-            bucket = "flip_all_answered"
-        else:
-            bucket = "flip_with_crash"
-        assert flip == (bucket in ("flip_all_answered", "flip_with_crash")), (iid, arm, axis, vals)
-        # S: how far apart a flip's answers are; flipped tuples of numeric tasks, answered values only
-        S = doubled = None
-        if flip and task in NUMERIC:
-            xs = [x for x in (num(k) for k in keys if k != "NA") if x is not None]
-            S, doubled = spread(xs, num(truth.get(iid)))
-        # (b) where a flipped M2 tuple diverges
-        where = None
-        if flip and arm.startswith("code/"):
-            bad = (sub["declared_ok"] == False).tolist()  # noqa: E712  (None = not known to be wrong)
-            where = divergence_site(vals, bad, all_answered)
-        if flip and arm.startswith("code/") and axis in ("relabel", "order") and task in READING_TASKS:
-            reading.append(dict(dataset=ds, task=task, model=model, instance_id=iid, with_crash=not all_answered,
-                                answers=[json.loads(k) for k in keys if k != "NA"]))
-        rows.append(dict(dataset=ds, task=task, instance_id=iid, cluster=cluster.get(iid, iid), model=model,
-                         arm=arm, axis=axis, n=n, bucket=bucket, flip=flip, D=D, robust=all(corr),
-                         S=S, doubled=doubled, where=where))
-T = pd.DataFrame(rows)
+def build_tuples(j):
+    """One row per tuple, and the flipped code tuples of the node-list tasks (the "other reading" analysis)."""
+    rows, reading = [], []
+    for (iid, model, arm), g in j.groupby(["instance_id", "model", "arm"], sort=False):
+        canon = g[g["axis"] == "canonical"]
+        ds, task = g["dataset"].iat[0], g["task"].iat[0]
+        for axis in FACTORS:
+            if arm.startswith("graph_as_code") and axis not in ("relabel", "order"):
+                continue
+            var = g[g["axis"] == axis]
+            sub = var if (axis == "relabel" and var["is_identity"].any()) else pd.concat([canon, var])
+            if sub["variant_id"].nunique() < 2:
+                continue
+            keys = [k if a else "NA" for k, a in zip(sub["answer_key"], sub["answered"])]
+            corr = sub["correct"].tolist()
+            vals = ["CORRECT" if c else k for k, c in zip(keys, corr)]
+            n = len(vals)
+            pairs = list(combinations(vals, 2))
+            D = sum(a != b for a, b in pairs) / len(pairs)
+            flip = D > 0
+            all_answered = "NA" not in keys
+            literal_same = all_answered and len(set(keys)) == 1
+            if literal_same and all(corr):
+                bucket = "same_correct"
+            elif literal_same:
+                bucket = "same_wrong"
+            elif all(corr):
+                bucket = "different_all_correct"
+            elif all(k == "NA" for k in keys):
+                bucket = "no_answer_all"
+            elif flip and all_answered:
+                bucket = "flip_all_answered"
+            else:
+                bucket = "flip_with_crash"
+            assert flip == (bucket in ("flip_all_answered", "flip_with_crash")), (iid, arm, axis, vals)
+            # S: how far apart a flip's answers are; flipped tuples of numeric tasks, answered values only
+            S = doubled = None
+            if flip and task in NUMERIC:
+                xs = [x for x in (num(k) for k in keys if k != "NA") if x is not None]
+                S, doubled = spread(xs, num(truth.get(iid)))
+            # (b) where a flipped M2 tuple diverges
+            where = None
+            if flip and arm.startswith("code/"):
+                bad = (sub["declared_ok"] == False).tolist()  # noqa: E712  (None = not known to be wrong)
+                where = divergence_site(vals, bad, all_answered)
+            if flip and arm.startswith("code/") and axis in ("relabel", "order") and task in READING_TASKS:
+                reading.append(dict(dataset=ds, task=task, model=model, instance_id=iid, with_crash=not all_answered,
+                                    answers=[json.loads(k) for k in keys if k != "NA"]))
+            rows.append(dict(dataset=ds, task=task, instance_id=iid, cluster=cluster.get(iid, iid), model=model,
+                             arm=arm, axis=axis, n=n, bucket=bucket, flip=flip, D=D, robust=all(corr),
+                             S=S, doubled=doubled, where=where))
+    return pd.DataFrame(rows), reading
+
+
+T, reading = build_tuples(j)
 M12 = T[T.arm.isin(ARMS_M12)]
 PERM = ["relabel", "order"]
 
@@ -215,6 +231,7 @@ out["localization_b_by_model_relabel+order"] = {f"{a}|{b}|{c}": {k: int(v) for k
 out["localization_b"] = loc_b
 
 # ---------------------------------------------------------------- localization (c)
+# mcnemar_m2_vs_m3 pools the relabel and order tuples; mcnemar_m2_vs_m3_by_axis (at the end) tests each factor.
 loc_c, mc_rows = {}, []
 for lib in ["native", "networkx"]:
     a = T[T.arm == f"code/{lib}"].set_index(["dataset", "model", "instance_id", "axis"]).flip
@@ -406,6 +423,50 @@ for ds, g in RO.assign(mode2=np.where(RO.arm == "direct", "M1", "M2")).groupby("
                    round(100 * float(np.nanpercentile(v, 97.5)), 1)]
             for i, (name, v) in enumerate([("flip", fl), ("weighted", wt)])}
 out["figure_intervals_relabel+order"] = fig_ci  # {dataset|model or all|M1 or M2: {flip|weighted: [rate, lo, hi]}}
+
+# ---------------------------------------------------------------- the Erdős M3 rerun
+# Nothing from here on draws random numbers. results/erdos_m3fix reruns M3 on Erdős with the graph type stated in
+# its prompts; M1, M2 and GraphQA have one run each.
+j3 = answer_frame([r for r in read_scored("erdos_m3fix") if r["mode"] == "graph_as_code"])
+T3 = build_tuples(j3)[0]
+
+
+def sig_counts(df, a, b):
+    """Cells in which a is significantly larger than b, and b than a (Holm-adjusted p < 0.05)."""
+    s = df.p_holm < 0.05
+    return int((s & (df[a] > df[b])).sum()), int((s & (df[a] < df[b])).sum())
+
+
+# ---------------------------------------------------------------- localization (c) by axis
+# mcnemar_m2_vs_m3 pools relabel and order. Here each factor is its own family of 16 cells (dataset x model x
+# library, Holm within the family), once with the first Erdős M3 run and once with the rerun (GraphQA's cells are
+# the same in both). first_run|relabel+order repeats mcnemar_m2_vs_m3.
+def m2_vs_m3(t_m3, axes):
+    res = []
+    for lib in ["native", "networkx"]:
+        a = T[(T.arm == f"code/{lib}") & T.axis.isin(axes)].set_index(key).flip
+        b = t_m3[(t_m3.arm == f"graph_as_code/{lib}") & t_m3.axis.isin(axes)].set_index(key).flip
+        pairs = pd.concat([a.rename("m2"), b.rename("m3")], axis=1, join="inner").reset_index()
+        for (ds, model), g in pairs.groupby(["dataset", "model"]):
+            m2o, m3o = int((g.m2 & ~g.m3).sum()), int((~g.m2 & g.m3).sum())
+            res.append(dict(dataset=ds, model=model, library=lib, tuples=int(len(g)), only_m2=m2o, only_m3=m3o,
+                            p=binomtest(m2o, m2o + m3o, 0.5).pvalue if m2o + m3o else 1.0))
+    df = pd.DataFrame(res)
+    df["p_holm"] = multipletests(df.p, method="holm")[1]
+    return df
+
+
+mc_axis, mc_axis_sum = {}, {}
+for run, t_m3 in [("first_run", T), ("rerun", pd.concat([T[T.dataset == "graphqa"], T3]))]:
+    for fac, axes in [("relabel", ["relabel"]), ("order", ["order"]), ("relabel+order", PERM)]:
+        df = m2_vs_m3(t_m3, axes)
+        if (run, fac) == ("first_run", "relabel+order"):
+            assert df.drop(columns="tuples").equals(MC), "the pooled family must repeat mcnemar_m2_vs_m3"
+        mc_axis[f"{run}|{fac}"] = df.round(4).to_dict("records")
+        m2_more, m3_more = sig_counts(df, "only_m2", "only_m3")
+        mc_axis_sum[f"{run}|{fac}"] = dict(cells=len(df), m2_more_sig=m2_more, m3_more_sig=m3_more)
+out["mcnemar_m2_vs_m3_by_axis"] = mc_axis  # {first_run or rerun|factor: [cells]}
+out["mcnemar_m2_vs_m3_by_axis_summary"] = mc_axis_sum
 
 Path(args.out).parent.mkdir(parents=True, exist_ok=True)
 json.dump(out, open(args.out, "w"), indent=1, default=float)
