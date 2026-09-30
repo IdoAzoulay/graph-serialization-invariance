@@ -6,9 +6,13 @@ the answer key for a wrong one, "NA" for no answer.
 """
 from __future__ import annotations
 
+import math
 from collections import Counter
 
 READING_TASKS = ("connected_nodes", "disconnected_nodes", "neighbor")
+# M3 never sees the graph text, so its structure and syntax answers repeat its reference answer; accuracy over
+# these three axes scores every mode on the serializations that can change what it computes
+LIKE_FOR_LIKE = ("canonical", "relabel", "order")
 
 
 def divergence_site(vals: list, bad_copy: list[bool], all_answered: bool) -> str:
@@ -59,3 +63,36 @@ def reading_tag(task: str, answers: list[set], base: set, other: set | None) -> 
     if other == base:
         return "readings coincide"
     return "takes the other reading" if any(s == other for s in answers) else "other"
+
+
+def like_for_like(axis: str) -> bool:
+    """Whether an answer counts in the like-for-like accuracy: the reference, a relabeling or an edge order."""
+    return axis in LIKE_FOR_LIKE
+
+
+def _number(x) -> float | None:
+    if isinstance(x, bool):
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_double(answer, truth) -> bool:
+    """Whether a numeric answer is exactly twice a positive true value, as when a degree is counted once for
+    each direction of an edge. Booleans and non-numbers are never doubles."""
+    a, t = _number(answer), _number(truth)
+    return a is not None and t is not None and t > 0 and abs(a - 2 * t) < 1e-9
+
+
+def durkalski(b: list[int], c: list[int]) -> tuple[float, float]:
+    """McNemar's test for pairs clustered in groups (Durkalski et al., 2003): b[k] and c[k] count cluster k's
+    discordant pairs of each kind. X = (sum_k (b_k - c_k))^2 / sum_k (b_k - c_k)^2 is chi-square with 1 degree
+    of freedom; returns (X, p). A cluster whose discordant pairs balance adds nothing; (0.0, 1.0) when all do."""
+    d = [x - y for x, y in zip(b, c)]
+    den = sum(v * v for v in d)
+    if den == 0:
+        return 0.0, 1.0
+    x = sum(d) ** 2 / den
+    return x, math.erfc(math.sqrt(x / 2))  # upper tail of chi-square(1)
