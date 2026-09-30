@@ -94,6 +94,20 @@ def test_prompt_fixes_reask_only_the_relabelings_and_are_not_mixed_up(tmp_path):
         main(["--config", str(cfg), "--stages", "score"])
 
 
+def test_score_stage_skips_replies_to_other_variants(tmp_path):
+    fixed = write_config(tmp_path, prompt_fixes=True)
+    main(["--config", str(fixed)])
+    scored = tmp_path / "results" / "pipe" / "scored" / "stub.jsonl"
+    n_fixed = len(list(read_jsonl(scored)))
+    # rebuilt with the published prompts, but the llm and exec stages not rerun: the relabelings' replies and
+    # their Graph-as-Code executions belong to the fixed variants and must not be scored against the published ones
+    main(["--config", str(write_config(tmp_path)), "--stages", "variants,score"])
+    rows = list(read_jsonl(scored))
+    assert 0 < len(rows) < n_fixed
+    assert not any("::relabel:s" in r["record_id"] and r["mode"] == "direct" for r in rows)
+    assert not any(r["params"].get("prompt_fixes") for r in rows)
+
+
 def test_a_changed_graph_is_executed_again_under_the_same_prompt(tmp_path):
     cfg = write_config(tmp_path)
     main(["--config", str(cfg)])
