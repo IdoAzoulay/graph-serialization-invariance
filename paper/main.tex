@@ -82,8 +82,6 @@ Our contributions are as follows. (i) A per-instance, single-factor invariance m
 
 \textbf{Computing with code.} Program-aided reasoning hands the computation to an interpreter \citep{gao}. CodeGraph \citep{cai} has GPT-3.5 write Python for GraphQA tasks, and across six encodings its best-worst accuracy gap is smaller than under chain-of-thought on every task. \citet{finkelshtein} find code generation the strongest interaction mode for node classification on text-rich graphs. Neither shows invariance: \citet{finkelshtein} use a single serialization, and CodeGraph compares aggregate accuracy over encodings that change several factors at once. Its one-shot example also supplies the solving function, so its model mostly copies the graph instead of writing the solving step, where we find the failures.
 
-\textbf{Agreement as an error signal.} Disagreement across samples detects hallucinations \citep{farquhar}, and aggregating answers over input orders reduces position bias \citep{tang}. Such signals cannot see errors that do not vary \citep{farquhar}. We measure how large that blind spot is for executed code.
-
 \section{Methodology}
 
 Each \emph{instance} is a graph, a question about it and the correct answer. We write each graph in several equivalent serializations, pose each one in three interaction modes, and check if the answers stay the same and whether they are correct.
@@ -508,7 +506,7 @@ Erdős & DeepSeek-V3.1 & 84 & 88 & 94 & 98 & 92 & 97 \\
 
 \textbf{Spread.} $S$ uses only the answers that exist and divides by 1 when $y = 0$.
 
-\textbf{Statistics.} McNemar's exact test (flips) and the Wilcoxon signed-rank test ($D$) are run for each model, dataset and library and Holm-corrected over the 16 cases. The logistic regression models flipping on mode, factor, model and task, with errors clustered by graph. Bootstrap intervals resample the graphs of each dataset with replacement 2,000 times. The repeat floor reports how often the answer to an identical prompt changes: Qwen3-8B's code exceeds it in all 8 cells, by 5.0-12.6 points, while the other three models' code does so in only 7 of 24, so their small residual is close to noise.
+\textbf{Statistics.} McNemar's exact test (flips) and the Wilcoxon signed-rank test ($D$) are run for each model, dataset and library and Holm-corrected over the 16 cases. The logistic regression models flipping on mode, factor, model and task, with errors clustered by graph. Bootstrap intervals resample the graphs of each dataset with replacement 2,000 times. The repeat floor reports how often the answer to an identical prompt changes, under the same flip rule: Qwen3-8B's code exceeds it in all 8 cells, by 4.0-11.6 points, while the other three models' code does so in only 3 of 24, so their small residual is close to noise.
 
 \begin{figure}[!htbp]
 \centering
