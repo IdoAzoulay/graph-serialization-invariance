@@ -1,7 +1,7 @@
 """A serialization variant is the 4-tuple (label_map, order, structure, syntax).
 
 Every non-canonical variant is produced from a reference by exactly one transform,
-each mutating exactly one of the four fields (Herbst et al., 2025). Relabelings
+each mutating exactly one of the four fields (Herbst et al., 2026). Relabelings
 follow Herbst's convention - relabel, then sort lexicographically - so the relabel
 axis is compared against a sorted identity reference rather than against positions.
 
