@@ -218,7 +218,7 @@ Syntax & \textbf{14.9} & 4.8 & \textbf{13.6}$^\dagger$ & \textbf{18.9} & 3.8 & \
 
 \subsection{Which failures accompany a flip?}\label{sec:localize}
 
-Most flips start in the program the model writes, and few in its copy of the graph. The graph a program declares matches the input in 98.1-99.9\% of code answers. Among failed plain-Python answers, the solving step accounts for 97.8-99\% on GraphQA and 77-81\% on Erdős, while with NetworkX crashes account for 59-97\% of Erdős failures. A wrong copy is at most about 13\% of failures, and it does not reveal itself: 64\% (GraphQA) and 60\% (Erdős) of programs that declare a wrong graph still answer correctly.
+Most flips start in the program the model writes, and few in its copy of the graph. The graph a program declares matches the input in 98.1-99.9\% of code answers. Among failed plain-Python answers, the solving step accounts for 97.8-99\% on GraphQA and 77-81\% on Erdős, while with NetworkX crashes account for 63-97\% of Erdős failures. A wrong copy is at most about 13\% of failures, and it does not reveal itself: 64\% (GraphQA) and 60\% (Erdős) of programs that declare a wrong graph still answer correctly.
 
 Failures are not flips, though, so Figure~\ref{fig:5} attributes each flip itself to where its serializations diverge. On GraphQA, 95.5\% of plain-Python flips start in the program. On Erdős the program still leads (61.5\%), but a crash starts 20.9\%, mostly DeepSeek-V4-Flash's, and a wrong copy 17.6\%: 35 of DeepSeek-V3.1's 40 flips come from a wrong copy of a long edge list.
 
@@ -506,7 +506,7 @@ Erdős & DeepSeek-V3.1 & 84 & 88 & 94 & 98 & 92 & 97 \\
 
 \textbf{Spread.} $S$ uses only the answers that exist and divides by 1 when $y = 0$.
 
-\textbf{Statistics.} McNemar's exact test (flips) and the Wilcoxon signed-rank test ($D$) are run for each model, dataset and library and Holm-corrected over the 16 cases. The logistic regression, one per dataset, models flipping on mode, factor, model and task, with errors clustered by graph. Bootstrap intervals resample the graphs of each dataset with replacement 2,000 times. The repeat floor reports how often the answer to an identical prompt changes, under the same flip rule: Qwen3-8B's code exceeds it in all 8 cells, by 4.0-11.6 points, while the other three models' code does so in only 3 of 24 (95\% Wald interval on the excess above 0), so their small residual is close to noise.
+\textbf{Statistics.} McNemar's exact test (flips) and the Wilcoxon signed-rank test ($D$) are run for each model, dataset and library and Holm-corrected over the 16 cases. The logistic regression, one per dataset, models flipping on mode, factor, model and task, with errors clustered by graph. Bootstrap intervals resample the graphs of each dataset with replacement 2,000 times. The repeat floor reports how often the answer to an identical prompt changes, under the same flip rule: Qwen3-8B's code exceeds it in all 8 cells, by 4.0-11.0 points, while the other three models' code does so in only 3 of 24 (95\% Wald interval on the excess above 0), so their small residual is close to noise.
 
 \begin{figure}[!htbp]
 \centering
