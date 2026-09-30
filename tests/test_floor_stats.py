@@ -168,7 +168,19 @@ def test_committed_flip_rule_table_matches_a_rerun():
     assert np.allclose(committed[["floor", "flip", "excess", "boot_lo", "boot_hi"]],
                        modes[["floor", "flip", "excess", "boot_lo", "boot_hi"]], atol=1e-5)
     pooled = committed[committed.model == "all"].set_index(["dataset", "arm"])
-    # four models counting equally: GraphQA M1 floor 5.25 -> flip 12.625, Erdos M1 excess 7.6 points
+    # four models counting equally: GraphQA M1 floor 5.25 -> flip 12.625, Erdos M1 excess 7.5 points
     assert math.isclose(pooled.loc[("graphqa", "direct/-"), "floor"], 0.0525)
     assert math.isclose(pooled.loc[("graphqa", "direct/-"), "flip"], 0.12625)
-    assert round(100 * pooled.loc[("erdos", "direct/-"), "excess"], 1) == 7.6
+    assert round(100 * pooled.loc[("erdos", "direct/-"), "excess"], 1) == 7.5
+
+
+def test_every_floor_cell_covers_every_sampled_instance():
+    """Relabel is judged against the sorted identity where an instance has one and against canonical where it
+    does not; either way every sampled instance is in the relabel cell, as in the order cell."""
+    for ds in fs.DATASETS:
+        rows = [json.loads(line) for line in (FLOOR / ds / "noise_floor_instances.jsonl").open()]
+        cells: dict = {}
+        for r in rows:
+            cells.setdefault((r["model"], r["mode"], r["library"], r["axis"]), set()).add(r["instance_id"])
+        for (model, mode, lib, axis), ids in cells.items():
+            assert ids == cells[(model, mode, lib, "order")], (ds, model, mode, lib, axis, len(ids))
